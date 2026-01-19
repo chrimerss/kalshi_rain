@@ -37,8 +37,8 @@ export default function Dashboard() {
   return (
     <main className="min-h-screen bg-gray-50 p-8">
       <header className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-800">RainCheck Forecast Dashboard</h1>
-        <p className="text-gray-600">Monthly Precipitation Tracker (Inches)</p>
+        <h1 className="text-3xl font-bold text-gray-800">Kalshi monthly rainfall forecast</h1>
+        <p className="text-gray-600">Monthly precipitation tracker (inches)</p>
       </header>
 
       <div className="grid grid-cols-1 gap-8">
