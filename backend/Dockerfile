@@ -3,7 +3,7 @@ FROM mambaorg/micromamba:1.5.1
 WORKDIR /app
 
 # Copy environment file
-COPY backend/environment.yml /app/environment.yml
+COPY --chown=$MAMBA_USER:$MAMBA_USER backend/environment.yml /app/environment.yml
 
 # Install dependencies
 RUN micromamba install -y -n base -f /app/environment.yml && \
@@ -13,7 +13,7 @@ RUN micromamba install -y -n base -f /app/environment.yml && \
 ARG MAMBA_DOCKERFILE_ACTIVATE=1
 
 # Copy backend source
-COPY backend /app/backend
+COPY --chown=$MAMBA_USER:$MAMBA_USER backend /app/backend
 # Copy entire project root files if needed (like config expecting root)
 # But config.py resolves relative to itself.
 # IMPORTANT: backend/src/config.py expects `rain_forecast/backend/src/config.py`
