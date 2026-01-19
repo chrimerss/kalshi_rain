@@ -14,8 +14,10 @@ services:
     build:
       context: .
       dockerfile: frontend/Dockerfile
+      args:
+        - NEXT_BASE_PATH=/forecast
     ports:
-      - "80:3000"
+      - "3001:3000"
     volumes:
       - raincheck-data:/backend/data
       # Frontend code expects to find DB at /backend/data due to relative path logic
@@ -36,6 +38,7 @@ services:
 
     environment:
       - NODE_ENV=production
+      - NEXT_BASE_PATH=/forecast
     restart: always
 
 volumes:

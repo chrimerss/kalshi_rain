@@ -6,6 +6,9 @@ RUN mkdir -p /backend/data
 COPY frontend/package*.json ./
 RUN npm install
 
+ARG NEXT_BASE_PATH
+ENV NEXT_BASE_PATH=${NEXT_BASE_PATH}
+
 COPY frontend ./
 # Build Next.js app
 RUN npm run build
