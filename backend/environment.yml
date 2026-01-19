@@ -1,0 +1,17 @@
+name: raincheck
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - requests
+  - beautifulsoup4
+  - boto3
+  - xarray
+  - cfgrib
+  - pandas
+  - pydantic
+  - eccodes
+  - pip
+  - pip:
+    - redis

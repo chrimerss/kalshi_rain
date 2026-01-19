@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    volumes:
+      - raincheck-data:/app/backend/data
+      # Mount shared volume so Python writes to it
+    restart: always
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "80:3000"
+    volumes:
+      - raincheck-data:/backend/data
+      # Frontend code expects to find DB at /backend/data due to relative path logic
+      # (../backend/data from /app)
+      # Frontend code does: `path.resolve(process.cwd(), '../backend/data/raincheck.db')`
+      # In container: cwd is /app.
+      # .. -> /
+      # /backend/data/raincheck.db
+      # So we should mount to /backend/data inside container?
+      # Wait. process.cwd() is /app.
+      # path.resolve('/app', '../backend/data') -> /backend/data.
+      # So inside frontend container, we need /backend/data to exist.
+      # BUT my Dockerfile created /app/backend/data.
+      # Let's verify `path.resolve`.
+      # If cwd=/app, ../ == /.
+      # ../backend/data == /backend/data.
+      # So I should mount to /backend/data in frontend container.
+
+    environment:
+      - NODE_ENV=production
+    restart: always
+
+volumes:
+  raincheck-data:

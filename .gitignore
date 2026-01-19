@@ -1,0 +1,31 @@
+# System
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+backend/env/
+.env
+
+# Dependencies
+node_modules/
+backend/env/
+
+# Data (Ignored as requested)
+backend/data/
+*.db
+*.csv
+
+# Logs
+*.log
+cron.log
+log.txt
+
+# Next.js
+.next/
+frontend/out/
+
+# IDE
+.vscode/
+.idea/
