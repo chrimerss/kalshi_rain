@@ -1,6 +1,8 @@
 import { getLatestForecasts } from '@/lib/api';
 import { RainBucket } from '@/components/RainBucket';
 
+export const dynamic = 'force-dynamic';
+
 // Mapping for display names
 const STATION_NAMES: Record<string, string> = {
   "KNYC": "NYC (Central Park)",
@@ -24,7 +26,7 @@ const MODEL_DURATIONS: Record<string, number> = {
   "GEM": 384
 };
 
-export const dynamic = 'force-dynamic';
+
 
 export default function Dashboard() {
   const stationForecasts = getLatestForecasts();

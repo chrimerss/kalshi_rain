@@ -1,4 +1,4 @@
-import db from './db';
+import { getDb } from './db';
 
 // ... imports
 export interface Forecast {
@@ -30,7 +30,7 @@ export interface StationForecast {
 }
 
 export function getLatestForecasts(): StationForecast[] {
-  if (!db) return [];
+  const db = getDb();
 
   const currentMonth = new Date().getMonth() + 1; // 1-12
 
