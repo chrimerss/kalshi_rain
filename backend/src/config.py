@@ -114,7 +114,9 @@ STATIONS: Dict[str, Station] = {
 # Open-Meteo API Configurations
 MODELS = {
     "GFS": "gfs_seamless",
-    "ECMWF": "ecmwf_ifs04",
+    "ECMWF IFS": "ecmwf_ifs",
+    "ECMWF IFS 0.25": "ecmwf_ifs025",
+    "ECMWF AIFS": "ecmwf_aifs025_single",
     "NAM": "nam_us",
     "HRRR": "hrrr_us",
     "ICON": "icon_seamless",

@@ -20,7 +20,9 @@ const STATION_NAMES: Record<string, string> = {
 const MODEL_DURATIONS: Record<string, number> = {
   "NBM": 25,     // NBM Hourly Text usually ~25h
   "NWS": 168,    // NWS Gridpoints usually 7 days
-  "ECMWF": 384,  // Open-Meteo provides up to 16 days
+  "ECMWF IFS": 384,
+  "ECMWF IFS 0.25": 384,
+  "ECMWF AIFS": 384,
   "GFS": 384,
   "ICON": 384,
   "GEM": 384

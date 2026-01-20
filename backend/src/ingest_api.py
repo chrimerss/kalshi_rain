@@ -54,7 +54,7 @@ def fetch_open_meteo_forecasts():
     # Global (GFS, ECMWF, GEM, ICON): ~10-16 days
     
     model_groups = [
-        {"days": 16, "models": ["gfs_seamless", "ecmwf_ifs04", "icon_seamless", "gem_global"]},
+        {"days": 16, "models": ["gfs_seamless", "ecmwf_ifs", "ecmwf_ifs025", "ecmwf_aifs025_single", "icon_seamless", "gem_global"]},
     ]
     
     for group in model_groups:
