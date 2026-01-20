@@ -34,8 +34,8 @@ export function RainBucket({
   }) : '';
 
   return (
-    <div className="flex flex-col items-center p-4 bg-white rounded-lg shadow-md border border-gray-200 w-full">
-      <h3 className="font-bold text-lg mb-1">{modelName}</h3>
+    <div className="flex flex-col items-center p-4 bg-white rounded-lg shadow-md border border-gray-200 w-full h-full">
+      <h3 className="font-bold text-lg mb-1 min-h-[3.5rem] flex items-center justify-center text-center leading-tight break-words px-2">{modelName}</h3>
       {initTime && (
         <div className="flex flex-col items-center mb-2">
           <div className="text-[10px] text-gray-400">Init: {formattedTime}</div>
