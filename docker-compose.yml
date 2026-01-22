@@ -14,8 +14,6 @@ services:
     build:
       context: .
       dockerfile: frontend/Dockerfile
-      args:
-        - NEXT_BASE_PATH=/forecast
     ports:
       - "3001:3000"
     volumes:
@@ -38,7 +36,6 @@ services:
 
     environment:
       - NODE_ENV=production
-      - NEXT_BASE_PATH=/forecast
     restart: always
 
 volumes:

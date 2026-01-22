@@ -26,14 +26,23 @@ def run_kalshi():
     except subprocess.CalledProcessError as e:
         logger.error(f"Kalshi failed: {e}")
 
+def run_scraper():
+    logger.info("Running NWS Scraper...")
+    try:
+        subprocess.run([PYTHON_EXEC, "-m", "backend.src.scraper"], check=True)
+    except subprocess.CalledProcessError as e:
+        logger.error(f"NWS scraper failed: {e}")
+
 if __name__ == "__main__":
     logger.info("Starting Scheduler...")
     
     # Run immediately on startup
     run_kalshi()
     run_ingest()
+    run_scraper()
     
     last_ingest_time = time.time()
+    last_scrape_time = time.time()
     
     while True:
         current_time = time.time()
@@ -45,6 +54,11 @@ if __name__ == "__main__":
         if current_time - last_ingest_time > 6 * 3600:
             run_ingest()
             last_ingest_time = current_time
+
+        # Run scraper every 6 hours (6 * 3600 seconds)
+        if current_time - last_scrape_time > 6 * 3600:
+            run_scraper()
+            last_scrape_time = current_time
             
         # Sleep for 60 seconds
         time.sleep(60)

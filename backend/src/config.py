@@ -65,13 +65,13 @@ STATIONS: Dict[str, Station] = {
         wfo_id="MTR"
     ),
     "HOU": Station(
-        id="KIAH",
-        name="Houston Intercontinental, TX",
-        lat=29.9844,
-        lon=-95.3414,
+        id="KHOU",
+        name="HOUSTON/HOBBY AIRPORT, TX",
+        lat=29.652400000000057,
+        lon=-95.27722999999997,
         kalshi_ticker="KXRAINHOUM", # Assumed pattern
-        nws_station_id="IAH",
-        wfo_id="HGX"
+        nws_station_id="HOU",
+        wfo_id="NWS"
     ),
     "SEA": Station(
         id="KSEA",

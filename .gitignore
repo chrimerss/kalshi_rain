@@ -16,7 +16,6 @@ backend/env/
 backend/data/
 *.db
 *.csv
-!climatology_rain.csv
 
 # Logs
 *.log

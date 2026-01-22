@@ -10,8 +10,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
 from backend.src.db import get_db_connection
 from backend.src.config import DB_PATH
 
-DEFAULT_CSV_PATH = Path(__file__).resolve().parent.parent.parent.parent / "climatology_rain.csv"
-CSV_PATH = Path(os.environ.get("CLIMATOLOGY_CSV", DEFAULT_CSV_PATH))
+CSV_PATH = Path("/Users/allen/Documents/Python/rain_forecast/climatology_rain.csv")
 
 def parse_month(month_str):
     try:

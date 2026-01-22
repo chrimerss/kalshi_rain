@@ -10,7 +10,7 @@ const STATION_NAMES: Record<string, string> = {
   "KMIA": "Miami",
   "KMDW": "Chicago",
   "KSFO": "San Francisco",
-  "KIAH": "Houston",
+  "KHOU": "Houston (Hobby)",
   "KSEA": "Seattle",
   "KAUS": "Austin",
   "KDFW": "Dallas",
@@ -20,9 +20,7 @@ const STATION_NAMES: Record<string, string> = {
 const MODEL_DURATIONS: Record<string, number> = {
   "NBM": 25,     // NBM Hourly Text usually ~25h
   "NWS": 168,    // NWS Gridpoints usually 7 days
-  "ECMWF IFS": 384,
-  "ECMWF IFS 0.25": 384,
-  "ECMWF AIFS": 384,
+  "ECMWF": 384,  // Open-Meteo provides up to 16 days
   "GFS": 384,
   "ICON": 384,
   "GEM": 384
@@ -39,8 +37,8 @@ export default function Dashboard() {
   return (
     <main className="min-h-screen bg-gray-50 p-8">
       <header className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-800">Kalshi monthly rainfall forecast</h1>
-        <p className="text-gray-600">Monthly precipitation tracker (inches)</p>
+        <h1 className="text-3xl font-bold text-gray-800">RainCheck Forecast Dashboard</h1>
+        <p className="text-gray-600">Monthly Precipitation Tracker (Inches)</p>
       </header>
 
       <div className="grid grid-cols-1 gap-8">
