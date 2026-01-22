@@ -1,7 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, Tuple
 import logging
 
@@ -144,6 +144,97 @@ def update_observed_precipitation():
                 )
             else:
                 logger.warning(f"Could not parse precip for {station.id}")
+
+def parse_max_temperature(html_content: bytes) -> Optional[float]:
+    """Parses the Yesterday's Maximum Temperature from CLI HTML content."""
+    soup = BeautifulSoup(html_content, "html.parser")
+    
+    # CLI Format typically:
+    # TEMPERATURE (F)
+    #                                      YESTERDAY
+    # MAXIMUM                                 82    
+    # MINIMUM                                 70    
+    # AVERAGE                                 76    
+    
+    pre_tags = soup.find_all("pre")
+    target_pre = None
+    for pre in pre_tags:
+        if pre.text and ("TEMPERATURE (F)" in pre.text or "TEMPERATURE" in pre.text):
+            target_pre = pre
+            break
+            
+    if not target_pre:
+        logger.warning("Could not find TEMPERATURE section in CLI product")
+        return None
+        
+    lines = target_pre.text.split('\n')
+    
+    for line in lines:
+        if "MAXIMUM" in line:
+            # Line example: " MAXIMUM           82      69      1200 PM  "
+            # We want the first number which represents YESTERDAY.
+            parts = line.split()
+            # parts: ['MAXIMUM', '82', '69', '1200', 'PM'] assuming format.
+            # Sometimes "MAXIMUM" is followed by a time? No usually strictly columnar.
+            
+            for part in parts[1:]:
+                # skip non-numeric
+                if part == "MAXIMUM": continue
+                
+                # Check if it's a number
+                try:
+                    val = float(part)
+                    return val # First number is usually Yesterday's Max
+                except ValueError:
+                    continue
+                    
+    return None
+
+def update_observed_temperature(target_date_str: Optional[str] = None):
+    """
+    Updates observed temperature for ALL stations.
+    If target_date_str is None, it assumes 'Yesterday' relative to Now (in Station Local Time).
+    However, CLI product usually reports 'YESTERDAY' data.
+    So if we run this today, we are updating yesterday's observation.
+    """
+    from .db import update_temperature_observation
+    import pytz # Need pytz for accurate local time calc if needed, 
+    # but CLI is always "Yesterday" relative to issuance.
+    # We just need to know what date "Yesterday" was for that station.
+    
+    for station_code, station in STATIONS.items():
+        logger.info(f"Scraping Temp for {station.name} ({station.id})...")
+        content = fetch_cli_product(station)
+        if content:
+            max_temp = parse_max_temperature(content)
+            
+            if max_temp is not None:
+                # determine date
+                # Station timezone
+                try:
+                    tz = pytz.timezone(station.timezone)
+                    now_local = datetime.now(tz)
+                    yesterday_local = now_local - timedelta(days=1)
+                    target_date = yesterday_local.strftime("%Y-%m-%d")
+                    
+                    if target_date_str:
+                        # If manually specified, use it? But CLI only provides "Yesterday".
+                        # So we can only verify if target_date_str matches yesterday.
+                        if target_date_str != target_date:
+                            logger.warning(f"CLI only has Yesterday data ({target_date}), but {target_date_str} requested.")
+                            continue
+                            
+                    logger.info(f"Found Max Temp for {station.id} ({target_date}): {max_temp}")
+                    
+                    update_temperature_observation(
+                        location_id=station.id,
+                        target_date=target_date,
+                        observed_value=max_temp
+                    )
+                except Exception as e:
+                    logger.error(f"Error determining date/saving for {station.id}: {e}")
+            else:
+                logger.warning(f"Could not parse Max Temp for {station.id}")
 
 if __name__ == "__main__":
     update_observed_precipitation()

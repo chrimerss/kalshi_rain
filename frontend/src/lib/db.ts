@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import path from 'path';
 
 // Resolve path to the database file
-const DB_PATH = path.resolve(process.cwd(), '../backend/data/raincheck.db');
+const DB_PATH = process.env.DB_PATH || path.resolve(process.cwd(), '../backend/data/raincheck.db');
 
 let dbInstance: Database.Database | null = null;
 

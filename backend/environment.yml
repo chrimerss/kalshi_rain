@@ -11,6 +11,7 @@ dependencies:
   - cfgrib
   - pandas
   - pydantic
+  - pytz
   - eccodes
   - pip
   - pip:

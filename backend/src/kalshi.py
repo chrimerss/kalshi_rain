@@ -25,69 +25,89 @@ def fetch_kalshi_markets():
     
     for station_id, station in STATIONS.items():
         time.sleep(0.2) # Rate limiting
-        ticker = station.kalshi_ticker
-        if not ticker:
-            continue
-            
-        logger.info(f"Fetching markets for {station.name} ({ticker})...")
         
-        try:
-            params = {
-                "series_ticker": ticker,
-                "limit": 100,
-                "status": "open" # Only want active trading markets
-            }
+        tickers_to_fetch = []
+        if station.kalshi_ticker:
+            tickers_to_fetch.append(station.kalshi_ticker)
+        if station.kalshi_temp_ticker:
+            tickers_to_fetch.append(station.kalshi_temp_ticker)
             
-            response = requests.get(KALSHI_API_URL, params=params, timeout=10)
+        for ticker in tickers_to_fetch:
+            logger.info(f"Fetching markets for {station.name} ({ticker})...")
             
-            if response.status_code == 200:
-                data = response.json()
-                markets = data.get('markets', [])
+            try:
+                params = {
+                    "series_ticker": ticker,
+                    "limit": 100,
+                    "status": "open" # Only want active trading markets
+                }
                 
-                logger.info(f"Found {len(markets)} markets for {ticker}.")
+                response = requests.get(KALSHI_API_URL, params=params, timeout=10)
                 
-                for m in markets:
-                    # m keys: ticker, title, yes_bid, no_bid, status, etc.
-                    # We want to display "Threshold" and "Prices"
-                    # The title usually contains the info, e.g. "Rain in NYC in Jan 2026?"
-                    # But the subtitle or other fields might specify ">1 inch".
-                    # Let's verify 'subtitle' or 'cap_strike' if available?
-                    # In my test output: "Rain in NYC in Jan 2026?" was the title.
-                    # The different markets were differentiated by ticker: ...-26JAN-1, ...-26JAN-2.
-                    # This implies the suffix is the threshold.
-                    # We might need to parse the threshold from the ticker or subtitle.
-                    # For now, let's save the 'subtitle' if it exists, or just the ticker.
+                if response.status_code == 200:
+                    data = response.json()
+                    markets = data.get('markets', [])
                     
-                    market_ticker = m.get('ticker')
-                    title = m.get('title')
-                    subtitle = m.get('subtitle', '') 
-                    yes_sub = m.get('yes_sub_title', '')
-                    yes_price = m.get('yes_bid', 0)
-                    no_price = m.get('no_bid', 0)
-                    status = m.get('status')
+                    logger.info(f"Found {len(markets)} markets for {ticker}.")
                     
-                    # Construct a display title
-                    # Prefer "Above X inches" (yes_sub_title)
-                    if yes_sub:
-                        display_title = yes_sub
-                    elif subtitle:
-                        display_title = subtitle
-                    else:
-                        display_title = title
+                    for m in markets:
+                        market_ticker = m.get('ticker')
+                        title = m.get('title')
+                        subtitle = m.get('subtitle', '') 
+                        yes_sub = m.get('yes_sub_title', '')
+                        yes_price = m.get('yes_bid', 0)
+                        no_price = m.get('no_bid', 0)
+                        status = m.get('status')
+                        
+                        # Parsing Date from Ticker or Title
+                        # Expected Ticker format for Daily High: KXHIGHLOC-YYMMMDD-STRIKE
+                        # e.g. KXHIGHNYCD-26JAN23-T66
+                        
+                        target_date_val = None
+                        try:
+                            parts = market_ticker.split('-')
+                            # Iterate parts to find the date
+                            for part in parts:
+                                # Attempt YYMMMDD (Daily)
+                                try:
+                                    dt = datetime.strptime(part, "%y%b%d")
+                                    target_date_val = dt.strftime("%Y-%m-%d")
+                                    break # Found it
+                                except ValueError:
+                                    pass
+                                    
+                                # Attempt YYMMM (Monthly)
+                                try:
+                                    dt = datetime.strptime(part, "%y%b")
+                                    target_date_val = dt.strftime("%Y-%m-%01") 
+                                    break # Found it
+                                except ValueError:
+                                    pass
+                        except:
+                            pass
+
+                        # Construct a display title
+                        if yes_sub:
+                            display_title = yes_sub
+                        elif subtitle:
+                            display_title = subtitle
+                        else:
+                            display_title = title
+                        
+                        save_market_data(
+                            ticker=market_ticker,
+                            location_id=station.id,
+                            title=display_title,
+                            yes_price=yes_price,
+                            no_price=no_price,
+                            status=status,
+                            target_date=target_date_val
+                        )
+                else:
+                    logger.error(f"Failed to fetch {ticker}: {response.status_code} - {response.text}")
                     
-                    save_market_data(
-                        ticker=market_ticker,
-                        location_id=station.id, # Map back to our Station ID (KNYC, etc)
-                        title=display_title,
-                        yes_price=yes_price,
-                        no_price=no_price,
-                        status=status
-                    )
-            else:
-                logger.error(f"Failed to fetch {ticker}: {response.status_code} - {response.text}")
-                
-        except Exception as e:
-            logger.error(f"Error fetching {ticker}: {e}")
+            except Exception as e:
+                logger.error(f"Error fetching {ticker}: {e}")
 
 if __name__ == "__main__":
     fetch_kalshi_markets()

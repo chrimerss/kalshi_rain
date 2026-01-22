@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 // Mapping for display names
 const STATION_NAMES: Record<string, string> = {
   "KNYC": "NYC (Central Park)",
-  "KLOX": "Los Angeles (KLOX)",
+  "KLAX": "Los Angeles (KLAX)",
   "KMIA": "Miami",
   "KMDW": "Chicago",
   "KSFO": "San Francisco",
@@ -36,9 +36,20 @@ export default function Dashboard() {
 
   return (
     <main className="min-h-screen bg-gray-50 p-8">
-      <header className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-800">RainCheck Forecast Dashboard</h1>
-        <p className="text-gray-600">Monthly Precipitation Tracker (Inches)</p>
+      <header className="mb-8 flex flex-col md:flex-row justify-between items-end gap-4 border-b border-gray-200 pb-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-800">RainCheck & Temperature</h1>
+          <p className="text-gray-600 mt-1">Weather Derivatives Tracker</p>
+        </div>
+
+        <nav className="flex gap-2">
+          <a href="/" className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium shadow-sm hover:bg-blue-700 transition">
+            Rain Forecast
+          </a>
+          <a href="/temperature" className="px-4 py-2 bg-white text-slate-600 border border-gray-200 rounded-lg font-medium hover:bg-gray-50 transition">
+            Temperature
+          </a>
+        </nav>
       </header>
 
       <div className="grid grid-cols-1 gap-8">

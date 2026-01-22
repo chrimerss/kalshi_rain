@@ -58,6 +58,13 @@ if __name__ == "__main__":
         # Run scraper every 6 hours (6 * 3600 seconds)
         if current_time - last_scrape_time > 6 * 3600:
             run_scraper()
+            # Run Temperature Verification
+            try:
+                logger.info("Running Temperature Verification...")
+                subprocess.run([PYTHON_EXEC, "-m", "backend.src.ingest_temperature", "--verify"], check=True)
+            except subprocess.CalledProcessError as e:
+                logger.error(f"Temp Verification failed: {e}")
+                
             last_scrape_time = current_time
             
         # Sleep for 60 seconds

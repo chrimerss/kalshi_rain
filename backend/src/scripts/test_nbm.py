@@ -39,7 +39,7 @@ def test_nbm():
             stream = response['Body']
             
             # Stations to find
-            target_stations = ["KLOX", "KNYC", "KMIA"] 
+            target_stations = ["KLAX", "KNYC", "KMIA"] 
             found_data = {}
             
             current_station = None
@@ -50,7 +50,7 @@ def test_nbm():
                 line = line_bytes.decode('utf-8', errors='ignore')
                 
                 # Check for station header
-                # Header format: "KLOX   NBM V4.1 ..." or similar? 
+                # Header format: "KLAX   NBM V4.1 ..." or similar? 
                 # In the snippet: " 086092 NBM V4.3 ..." - The first token was 086092.
                 # Maybe station ID is there? 
                 # Let's look for our target stations in the line.

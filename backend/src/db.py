@@ -58,6 +58,21 @@ def init_db():
     # Index for fast lookups and Uniqueness to prevent duplicates
     c.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_forecasts_unique ON forecasts (location_id, model_name, init_time)')
     c.execute('CREATE INDEX IF NOT EXISTS idx_forecasts_loc_model ON forecasts (location_id, model_name)')
+
+    # Table for Temperature Forecasts
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS temperature_forecasts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            location_id TEXT NOT NULL,
+            target_date TEXT NOT NULL,       -- YYYY-MM-DD
+            model_name TEXT NOT NULL,
+            forecast_value REAL,             -- Forecasted Max Temp (F)
+            observed_value REAL,             -- Observed Max Temp (F)
+            error REAL,                      -- forecast - observed
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(location_id, target_date, model_name)
+        )
+    ''')
     
     conn.commit()
     conn.close()
@@ -135,14 +150,20 @@ def get_latest_forecasts():
     conn.close()
     return [dict(row) for row in rows]
 
-def save_market_data(ticker, location_id, title, yes_price, no_price, status):
+def save_market_data(ticker, location_id, title, yes_price, no_price, status, target_date=None):
     conn = get_db_connection()
     with conn:
+        # Check if column exists (migration hack for existing dbs)
+        try:
+            conn.execute("ALTER TABLE kalshi_markets ADD COLUMN target_date TEXT")
+        except:
+            pass
+            
         conn.execute("""
             INSERT OR REPLACE INTO kalshi_markets 
-            (ticker, location_id, title, yes_price, no_price, status, last_updated)
-            VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-        """, (ticker, location_id, title, yes_price, no_price, status))
+            (ticker, location_id, title, yes_price, no_price, status, target_date, last_updated)
+            VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        """, (ticker, location_id, title, yes_price, no_price, status, target_date))
     conn.close()
 
 def get_latest_markets(location_id):
@@ -154,6 +175,53 @@ def get_latest_markets(location_id):
         ORDER BY ticker
     """, (location_id,))
     rows = cursor.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+def save_temperature_forecast(location_id, target_date, model_name, forecast_value):
+    conn = get_db_connection()
+    c = conn.cursor()
+    
+    # Upsert: preserved observed_value if it exists
+    c.execute('''
+        INSERT INTO temperature_forecasts (location_id, target_date, model_name, forecast_value)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(location_id, target_date, model_name) DO UPDATE SET
+        forecast_value = excluded.forecast_value,
+        created_at = CURRENT_TIMESTAMP
+    ''', (location_id, target_date, model_name, forecast_value))
+    
+    conn.commit()
+    conn.close()
+
+def update_temperature_observation(location_id, target_date, observed_value):
+    conn = get_db_connection()
+    c = conn.cursor()
+    
+    # Update ALL model rows for that target_date with the same observed value.
+    c.execute('''
+        UPDATE temperature_forecasts
+        SET observed_value = ?,
+            error = forecast_value - ?
+        WHERE location_id = ? AND target_date = ?
+    ''', (observed_value, observed_value, location_id, target_date))
+    
+    conn.commit()
+    conn.close()
+
+def get_temperature_forecasts(location_id, limit=30):
+    conn = get_db_connection()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    
+    c.execute('''
+        SELECT * FROM temperature_forecasts
+        WHERE location_id = ?
+        ORDER BY target_date DESC
+        LIMIT ?
+    ''', (location_id, limit))
+    
+    rows = c.fetchall()
     conn.close()
     return [dict(row) for row in rows]
 

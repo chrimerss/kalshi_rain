@@ -323,17 +323,17 @@ def fetch_nbm_forecasts():
         # We look for Station ID line.
         # Then we look for header line with Date? Or Station ID line IS the header?
         # Header: "086092 NBM V4.3 ..." 
-        # Station line: "KLOX    NBM V4.3 ..." - Wait, the test script output showed "086092" first?
+        # Station line: "KLAX    NBM V4.3 ..." - Wait, the test script output showed "086092" first?
         # The test script output:
-        # "Captured block for KLOX"
+        # "Captured block for KLAX"
         # "UTC: UTC 04 05..."
-        # But wait, did I see the line *containing* KLOX in the snippet?
-        # Snippet: " 086092 NBM V4.3 ... KLOX found!"
+        # But wait, did I see the line *containing* KLAX in the snippet?
+        # Snippet: " 086092 NBM V4.3 ... KLAX found!"
         # Ah, looking at `test_nbm.py` output again...
-        # "Captured block for KLOX"
-        # The line triggering "Found station" was: "KLOX   NBM V4.3 NBH GUIDANCE ..." (Presumably, I need to verify EXACT format).
+        # "Captured block for KLAX"
+        # The line triggering "Found station" was: "KLAX   NBM V4.3 NBH GUIDANCE ..." (Presumably, I need to verify EXACT format).
         # Actually my test script checked `if parts[0] in target_stations`.
-        # So the line starts with "KLOX".
+        # So the line starts with "KLAX".
         
         for line_bytes in stream.iter_lines():
             if not line_bytes: continue
@@ -345,7 +345,7 @@ def fetch_nbm_forecasts():
             if parts[0] in STATIONS:
                 current_station = parts[0]
                 # Parse Date from header line
-                # "KLOX   NBM V4.3 NBH GUIDANCE    1/19/2026  0300 UTC"
+                # "KLAX   NBM V4.3 NBH GUIDANCE    1/19/2026  0300 UTC"
                 # Date is usually at index -3 (date) and -2 (time)?
                 # Let's find the date part "M/D/YYYY".
                 try:

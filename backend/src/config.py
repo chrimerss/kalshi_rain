@@ -1,12 +1,15 @@
 from pydantic import BaseModel
 from typing import Dict, List, Optional
 from pathlib import Path
+import os
 
 # Base Paths
 BASE_DIR = Path(__file__).resolve().parent.parent.parent # rain_forecast/
 BACKEND_DIR = BASE_DIR / "backend"
 DATA_DIR = BACKEND_DIR / "data"
-DB_PATH = DATA_DIR / "raincheck.db"
+# Allow override via ENV for Docker
+env_db = os.getenv("DB_PATH")
+DB_PATH = Path(env_db) if env_db else (DATA_DIR / "raincheck.db")
 
 class Station(BaseModel):
     id: str
@@ -14,8 +17,10 @@ class Station(BaseModel):
     lat: float
     lon: float
     kalshi_ticker: str
+    kalshi_temp_ticker: Optional[str] = None
     nws_station_id: str
     wfo_id: str
+    timezone: str
 
 # Station Configuration
 STATIONS: Dict[str, Station] = {
@@ -24,18 +29,22 @@ STATIONS: Dict[str, Station] = {
         name="Central Park, NY", 
         lat=40.7829, 
         lon=-73.9654, 
-        kalshi_ticker="KXRAINNYCM", # Verified
+        kalshi_ticker="KXRAINNYCM", 
+        kalshi_temp_ticker="KXHIGHNYCD", # Example: Needs verification
         nws_station_id="NYC",
-        wfo_id="OKX" 
+        wfo_id="OKX",
+        timezone="America/New_York"
     ),
     "CLILAX": Station(
-        id="KLOX",
-        name="Los Angeles (KLOX), CA",
-        lat=34.2008, 
-        lon=-119.2006,
-        kalshi_ticker="KXRAINLAXM", # Assumption: LAX based
+        id="KLAX",
+        name="Los Angeles (KLAX), CA",
+        lat=33.93816, 
+        lon=-118.3866,
+        kalshi_ticker="KXRAINLAXM", 
+        kalshi_temp_ticker="KXHIGHLAX",
         nws_station_id="LAX",
-        wfo_id="LOX"
+        wfo_id="LOX",
+        timezone="America/Los_Angeles"
     ),
     "MIA": Station(
         id="KMIA",
@@ -43,8 +52,10 @@ STATIONS: Dict[str, Station] = {
         lat=25.7932,
         lon=-80.2906,
         kalshi_ticker="KXRAINMIAM",
+        kalshi_temp_ticker="KXHIGHMIA",
         nws_station_id="MIA",
-        wfo_id="MFL"
+        wfo_id="MFL",
+        timezone="America/New_York"
     ),
     "CHI": Station(
         id="KMDW",
@@ -52,62 +63,76 @@ STATIONS: Dict[str, Station] = {
         lat=41.7868,
         lon=-87.7522,
         kalshi_ticker="KXRAINCHIM",
+        kalshi_temp_ticker="KXHIGHCHI",
         nws_station_id="MDW",
-        wfo_id="LOT"
+        wfo_id="LOT",
+        timezone="America/Chicago"
     ),
     "SFO": Station(
         id="KSFO",
         name="San Francisco International Airport, CA",
         lat=37.6188,
         lon=-122.3754,
-        kalshi_ticker="KXRAINSFOM", # User provided
+        kalshi_ticker="KXRAINSFOM", 
+        kalshi_temp_ticker="KXHIGHSFO",
         nws_station_id="SFO",
-        wfo_id="MTR"
+        wfo_id="MTR",
+        timezone="America/Los_Angeles"
     ),
     "HOU": Station(
         id="KHOU",
         name="HOUSTON/HOBBY AIRPORT, TX",
         lat=29.652400000000057,
         lon=-95.27722999999997,
-        kalshi_ticker="KXRAINHOUM", # Assumed pattern
+        kalshi_ticker="KXRAINHOUM", 
+        kalshi_temp_ticker="KXHIGHHOU",
         nws_station_id="HOU",
-        wfo_id="NWS"
+        wfo_id="NWS",
+        timezone="America/Chicago"
     ),
     "SEA": Station(
         id="KSEA",
         name="Seattle-Tacoma International Airport, WA",
         lat=47.4502,
         lon=-122.3088,
-        kalshi_ticker="KXRAINSEAM", # User provided
-        nws_station_id="SEA", # User requested SEA issued product
-        wfo_id="SEW"
+        kalshi_ticker="KXRAINSEAM", 
+        kalshi_temp_ticker="KXHIGHSEA",
+        nws_station_id="SEA",
+        wfo_id="SEW",
+        timezone="America/Los_Angeles"
     ),
     "AUS": Station(
         id="KAUS",
         name="Austin-Bergstrom International Airport, TX",
         lat=30.1975,
         lon=-97.6664,
-        kalshi_ticker="KXRAINAUSM", # User provided
+        kalshi_ticker="KXRAINAUSM", 
+        kalshi_temp_ticker="KXHIGHAUS",
         nws_station_id="ATT",
-        wfo_id="EWX"
+        wfo_id="EWX",
+        timezone="America/Chicago"
     ),
     "DFW": Station(
         id="KDFW",
         name="Dallas/Fort Worth International Airport, TX",
         lat=32.8998,
         lon=-97.0403,
-        kalshi_ticker="KXRAINDALM", # User provided (Dallas)
+        kalshi_ticker="KXRAINDALM", 
+        kalshi_temp_ticker="KXHIGHDAL",
         nws_station_id="DFW",
-        wfo_id="FWD"
+        wfo_id="FWD",
+        timezone="America/Chicago"
     ),
     "DEN": Station(
         id="KDEN",
         name="Denver International Airport, CO",
         lat=39.8561,
         lon=-104.6737,
-        kalshi_ticker="KXRAINDENM", # User provided
+        kalshi_ticker="KXRAINDENM", 
+        kalshi_temp_ticker="KXHIGHDEN",
         nws_station_id="DEN",
-        wfo_id="BOU"
+        wfo_id="BOU",
+        timezone="America/Denver"
     )
 }
 
