@@ -2,7 +2,9 @@ import time
 import subprocess
 import logging
 import sys
+from datetime import datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -33,6 +35,28 @@ def run_scraper():
     except subprocess.CalledProcessError as e:
         logger.error(f"NWS scraper failed: {e}")
 
+def run_temperature_forecast():
+    logger.info("Running Temperature Forecast Ingestion...")
+    try:
+        subprocess.run([PYTHON_EXEC, "-m", "backend.src.ingest_temperature", "--forecast"], check=True)
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Temperature forecast failed: {e}")
+
+def run_temperature_verify():
+    logger.info("Running Temperature Verification...")
+    try:
+        subprocess.run([PYTHON_EXEC, "-m", "backend.src.ingest_temperature", "--verify"], check=True)
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Temperature verification failed: {e}")
+
+def get_next_temperature_run() -> datetime:
+    mst_tz = ZoneInfo("America/Denver")
+    now_mst = datetime.now(mst_tz)
+    target = now_mst.replace(hour=18, minute=0, second=0, microsecond=0)
+    if now_mst >= target:
+        target = target + timedelta(days=1)
+    return target
+
 if __name__ == "__main__":
     logger.info("Starting Scheduler...")
     
@@ -40,9 +64,11 @@ if __name__ == "__main__":
     run_kalshi()
     run_ingest()
     run_scraper()
+    run_temperature_forecast()
     
     last_ingest_time = time.time()
     last_scrape_time = time.time()
+    next_temp_run = get_next_temperature_run()
     
     while True:
         current_time = time.time()
@@ -58,14 +84,12 @@ if __name__ == "__main__":
         # Run scraper every 6 hours (6 * 3600 seconds)
         if current_time - last_scrape_time > 6 * 3600:
             run_scraper()
-            # Run Temperature Verification
-            try:
-                logger.info("Running Temperature Verification...")
-                subprocess.run([PYTHON_EXEC, "-m", "backend.src.ingest_temperature", "--verify"], check=True)
-            except subprocess.CalledProcessError as e:
-                logger.error(f"Temp Verification failed: {e}")
-                
+            run_temperature_verify()
             last_scrape_time = current_time
+
+        if datetime.now(ZoneInfo("America/Denver")) >= next_temp_run:
+            run_temperature_forecast()
+            next_temp_run = get_next_temperature_run()
             
         # Sleep for 60 seconds
         time.sleep(60)

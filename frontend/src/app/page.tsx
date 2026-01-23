@@ -43,10 +43,16 @@ export default function Dashboard() {
         </div>
 
         <nav className="flex gap-2">
-          <a href="/" className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium shadow-sm hover:bg-blue-700 transition">
+          <a
+            href="/forecast/"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium shadow-sm hover:bg-blue-700 transition"
+          >
             Rain Forecast
           </a>
-          <a href="/temperature" className="px-4 py-2 bg-white text-slate-600 border border-gray-200 rounded-lg font-medium hover:bg-gray-50 transition">
+          <a
+            href="/forecast/temperature"
+            className="px-4 py-2 bg-white text-slate-600 border border-gray-200 rounded-lg font-medium hover:bg-gray-50 transition"
+          >
             Temperature
           </a>
         </nav>

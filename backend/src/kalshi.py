@@ -55,8 +55,12 @@ def fetch_kalshi_markets():
                         title = m.get('title')
                         subtitle = m.get('subtitle', '') 
                         yes_sub = m.get('yes_sub_title', '')
-                        yes_price = m.get('yes_bid', 0)
-                        no_price = m.get('no_bid', 0)
+                        yes_ask = m.get('yes_ask', 0) or 0
+                        no_ask = m.get('no_ask', 0) or 0
+
+                        # Always store ask prices for display.
+                        yes_price = yes_ask
+                        no_price = no_ask
                         status = m.get('status')
                         
                         # Parsing Date from Ticker or Title

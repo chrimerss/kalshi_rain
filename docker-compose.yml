@@ -5,7 +5,7 @@ services:
       dockerfile: backend/Dockerfile
     container_name: raincheck-backend
     volumes:
-      - raincheck-data:/app/backend/data
+      - ./data:/app/backend/data
       - ./backend/src:/app/backend/src # Optional: For dev hot-reload if using different cmd
     environment:
       - DB_PATH=/app/backend/data/raincheck.db
@@ -17,19 +17,15 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: raincheck-frontend
+    user: "0:0"
     ports:
-      - "3000:3000"
+      - "3001:3000"
     volumes:
-      - raincheck-data:/app/backend/data:ro # Read-only access to DB ideally? Better-sqlite3 might want write for WAL?
-      # Actually better-sqlite3 WAL mode writes to .uwal / .wal files alongside DB.
-      # So it needs WRITE access to the DIRECTORY.
-      # So remove :ro
-      - raincheck-data:/app/backend/data
+      - ./data:/app/backend/data
     environment:
       - DB_PATH=/app/backend/data/raincheck.db
     depends_on:
       - backend
     restart: unless-stopped
 
-volumes:
-  raincheck-data:
+volumes: {}
