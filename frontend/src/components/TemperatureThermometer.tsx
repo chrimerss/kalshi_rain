@@ -8,6 +8,7 @@ interface TemperatureThermometerProps {
         model: string;
         temp: number;
         color: string;
+        correctCount: number;
     }[];
     observed?: number;
 }
@@ -37,6 +38,9 @@ const TemperatureThermometer: React.FC<TemperatureThermometerProps> = ({ station
 
                     return (
                         <div key={f.model} className="flex flex-col items-center min-w-[40px]">
+                            <div className="text-[11px] font-semibold text-emerald-700">
+                                +{f.correctCount}
+                            </div>
                             <div className="thermometer-wrapper scale-75 origin-bottom transform-gpu">
                                 <span className="thermometer" style={backgroundStyle}>
                                     <span className="invisible">Temp</span>

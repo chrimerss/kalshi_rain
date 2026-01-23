@@ -142,6 +142,8 @@ MODELS = {
     "ECMWF IFS": "ecmwf_ifs",
     "ECMWF IFS 0.25": "ecmwf_ifs025",
     "ECMWF AIFS": "ecmwf_aifs025_single",
+    "NBM CONUS": "ncep_nbm_conus",
+    "GFS Global": "gfs_global",
     "NAM": "nam_us",
     "HRRR": "hrrr_us",
     "ICON": "icon_seamless",

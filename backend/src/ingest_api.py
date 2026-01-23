@@ -39,22 +39,25 @@ def fetch_open_meteo_forecasts():
     lons = [s.lon for s in STATIONS.values()]
     station_ids = list(STATIONS.keys())
     
-    # We want daily sums to easily calculate the remainder of the month
-    # We also ask for 'precipitation_sum' or 'rain_sum'. 'rain_sum' excludes snow, 'precipitation_sum' includes it.
-    # Given the app is "RainForecast", but usually "Precipitation" is desired for water/hydro.
-    # The previous GRIB logic extracted Total Precip. Let's use 'precipitation_sum'.
-    
-    # Models to query - Grouped by Forecast Horizon to avoid API errors
-    # HRRR: ~2 days (48h)
-    # NAM: ~2.5 days (60h)
-    # Global (GFS, ECMWF, GEM, ICON): ~10-16 days
+    # We want daily sums to easily calculate the remainder of the month.
+    # Use 'precipitation_sum' to include all precipitation.
     
     # Models to query - Grouped by Forecast Horizon
-    # User confirmed NAM/HRRR are not needed/available via this API.
-    # Global (GFS, ECMWF, GEM, ICON): ~10-16 days
-    
+    # NBM CONUS: ~11 days
+    # GraphCast, GFS Global, ECMWF, ICON, GEM: ~16 days
     model_groups = [
-        {"days": 16, "models": ["gfs_seamless", "ecmwf_ifs", "ecmwf_ifs025", "ecmwf_aifs025_single", "icon_seamless", "gem_global"]},
+        {"days": 11, "models": ["ncep_nbm_conus"]},
+        {
+            "days": 16,
+            "models": [
+                "gfs_global",
+                "ecmwf_ifs",
+                "ecmwf_ifs025",
+                "ecmwf_aifs025_single",
+                "icon_seamless",
+                "gem_global",
+            ],
+        },
     ]
     
     for group in model_groups:
@@ -64,7 +67,7 @@ def fetch_open_meteo_forecasts():
         params = {
             "latitude": lats,
             "longitude": lons,
-            "hourly": "precipitation", 
+            "daily": "precipitation_sum",
             "timezone": "UTC",
             "precipitation_unit": "inch",
             "models": models,
@@ -85,9 +88,9 @@ def fetch_open_meteo_forecasts():
                 station_id = station_ids[i]
                 station = STATIONS[station_id]
                 
-                hourly_data = station_data.get("hourly", {})
+                daily_data = station_data.get("daily", {})
                 # parsing with utc=True ensures timezone-aware UTC
-                times = pd.to_datetime(hourly_data.get("time", []), utc=True)
+                times = pd.to_datetime(daily_data.get("time", []), utc=True)
                 
                 # No need for manual localization now
                 
@@ -97,28 +100,29 @@ def fetch_open_meteo_forecasts():
                     if not model_friendly_name:
                         continue
 
-                    # Key usually "precipitation_modelname"
-                    target_key = f"precipitation_{model_api_name}"
-                    if target_key not in hourly_data:
-                         # Fallback for when only 1 model is requested?
-                         # API usually appends suffix if 'models' param is used.
-                         if f"precipitation" in hourly_data and len(models) == 1:
-                             target_key = "precipitation"
-                         else:
-                             continue
-                    
-                    values = hourly_data[target_key]
+                    # Key usually "precipitation_sum_modelname"
+                    target_key = f"precipitation_sum_{model_api_name}"
+                    if target_key not in daily_data:
+                        # Fallback for when only 1 model is requested
+                        if "precipitation_sum" in daily_data and len(models) == 1:
+                            target_key = "precipitation_sum"
+                        else:
+                            continue
+
+                    values = daily_data[target_key]
                     df = pd.DataFrame({'time': times, 'val': values})
                     
-                    # Sum from NOW until End of Month
-                    relevant_df = df[(df['time'] >= now) & (df['time'] <= month_end)]
+                    # Sum from today (UTC) until End of Month
+                    today = now.date()
+                    month_end_date = month_end.date()
+                    relevant_df = df[(df['time'].dt.date >= today) & (df['time'].dt.date <= month_end_date)]
                     
                     forecast_remainder = relevant_df['val'].sum()
                     
                     # Partiality Check
                     if not df.empty:
-                        latest_forecast_time = df['time'].max()
-                        is_partial = latest_forecast_time < month_end
+                        latest_forecast_date = df['time'].max().date()
+                        is_partial = latest_forecast_date < month_end_date
                     else:
                         is_partial = True
                         forecast_remainder = 0.0

@@ -51,6 +51,17 @@ export default function TemperaturePage() {
 
                     const relevantForecasts = data.forecasts.filter(f => f.target_date === targetDate);
 
+                    // Build correctness counts per model using observed values.
+                    const modelCorrectness: Record<string, number> = {};
+                    data.forecasts.forEach(f => {
+                        if (f.observed_value === null || f.observed_value === undefined) return;
+                        const roundedForecast = Math.round(f.forecast_value);
+                        const roundedObserved = Math.round(f.observed_value);
+                        if (roundedForecast === roundedObserved) {
+                            modelCorrectness[f.model_name] = (modelCorrectness[f.model_name] || 0) + 1;
+                        }
+                    });
+
                     // Map to thermometer format
                     const thermoForecasts = relevantForecasts.map(f => {
                         let color = "bg-blue-500";
@@ -61,7 +72,8 @@ export default function TemperaturePage() {
                         return {
                             model: f.model_name,
                             temp: f.forecast_value,
-                            color: color
+                            color: color,
+                            correctCount: modelCorrectness[f.model_name] || 0
                         };
                     });
 

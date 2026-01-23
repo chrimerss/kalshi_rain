@@ -197,14 +197,20 @@ def save_temperature_forecast(location_id, target_date, model_name, forecast_val
 def update_temperature_observation(location_id, target_date, observed_value):
     conn = get_db_connection()
     c = conn.cursor()
-    
+
+    def round_half_up(value: float) -> int:
+        return int(value + 0.5)
+
+    rounded_observed = round_half_up(observed_value)
+
     # Update ALL model rows for that target_date with the same observed value.
+    # Error is computed using rounded forecast and observed values.
     c.execute('''
         UPDATE temperature_forecasts
         SET observed_value = ?,
-            error = forecast_value - ?
+            error = (CAST(forecast_value + 0.5 AS INTEGER)) - ?
         WHERE location_id = ? AND target_date = ?
-    ''', (observed_value, observed_value, location_id, target_date))
+    ''', (rounded_observed, rounded_observed, location_id, target_date))
     
     conn.commit()
     conn.close()

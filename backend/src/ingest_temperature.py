@@ -39,14 +39,27 @@ def fetch_open_meteo_temp():
         tomorrow_dt, tomorrow_str = get_next_day_date(station)
         
         # Models to query
-        models = ["gfs_seamless", "ecmwf_ifs", "ecmwf_ifs025", "ecmwf_aifs025_single", "gem_global", "icon_seamless"]
+        models = [
+            "gfs_hrrr",
+            "ncep_nbm_conus",
+            "gfs_graphcast025",
+            "gfs_seamless",
+            "gem_global",
+            "icon_seamless",
+            "ecmwf_ifs",
+            "ecmwf_ifs025",
+            "ecmwf_aifs025_single",
+        ]
         model_names_map = {
+             "gfs_hrrr": "HRRR",
+             "ncep_nbm_conus": "NBM",
+             "gfs_graphcast025": "GraphCast",
              "gfs_seamless": "GFS",
+             "gem_global": "GEM",
+             "icon_seamless": "ICON",
              "ecmwf_ifs": "ECMWF IFS",
              "ecmwf_ifs025": "ECMWF IFS 0.25",
              "ecmwf_aifs025_single": "ECMWF AIFS",
-             "gem_global": "GEM",
-             "icon_seamless": "ICON"
         }
         
         params = {
