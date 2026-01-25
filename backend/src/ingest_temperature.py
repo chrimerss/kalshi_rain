@@ -3,7 +3,6 @@ import requests
 import logging
 import pytz
 from datetime import datetime, timedelta
-import pandas as pd
 import sys
 from pathlib import Path
 
@@ -19,55 +18,54 @@ logger = logging.getLogger(__name__)
 
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 
+# Models to query
+TEMP_MODELS = [
+    "gfs_hrrr",
+    "ncep_nbm_conus",
+    "gfs_graphcast025",
+    "gfs_seamless",
+    "gem_global",
+    "icon_seamless",
+    "ecmwf_ifs",
+    "ecmwf_ifs025",
+    "ecmwf_aifs025_single",
+]
+
+MODEL_NAMES_MAP = {
+    "gfs_hrrr": "HRRR",
+    "ncep_nbm_conus": "NBM",
+    "gfs_graphcast025": "GraphCast",
+    "gfs_seamless": "GFS",
+    "gem_global": "GEM",
+    "icon_seamless": "ICON",
+    "ecmwf_ifs": "ECMWF IFS",
+    "ecmwf_ifs025": "ECMWF IFS 0.25",
+    "ecmwf_aifs025_single": "ECMWF AIFS",
+}
+
+
 def get_next_day_date(station: Station) -> tuple[datetime, str]:
-    """
-    Returns the (datetime_obj, date_string) for 'Tomorrow' in the station's local time.
-    """
+    """Returns (datetime_obj, date_string) for 'Tomorrow' in station's local time."""
     tz = pytz.timezone(station.timezone)
     now_local = datetime.now(tz)
     tomorrow_local = now_local + timedelta(days=1)
     return tomorrow_local, tomorrow_local.strftime("%Y-%m-%d")
 
+
 def fetch_open_meteo_temp():
-    """
-    Fetches Next Day Max Temp from Open-Meteo.
-    """
-    logger.info("Fetching Temperature from Open-Meteo...")
+    """Fetches Next Day Max and Min Temp from Open-Meteo for all stations."""
+    logger.info("Fetching Temperature (High & Low) from Open-Meteo...")
     
-    # Process station by station to ensure correct timezone handling
     for station_id, station in STATIONS.items():
         tomorrow_dt, tomorrow_str = get_next_day_date(station)
         
-        # Models to query
-        models = [
-            "gfs_hrrr",
-            "ncep_nbm_conus",
-            "gfs_graphcast025",
-            "gfs_seamless",
-            "gem_global",
-            "icon_seamless",
-            "ecmwf_ifs",
-            "ecmwf_ifs025",
-            "ecmwf_aifs025_single",
-        ]
-        model_names_map = {
-             "gfs_hrrr": "HRRR",
-             "ncep_nbm_conus": "NBM",
-             "gfs_graphcast025": "GraphCast",
-             "gfs_seamless": "GFS",
-             "gem_global": "GEM",
-             "icon_seamless": "ICON",
-             "ecmwf_ifs": "ECMWF IFS",
-             "ecmwf_ifs025": "ECMWF IFS 0.25",
-             "ecmwf_aifs025_single": "ECMWF AIFS",
-        }
-        
+        # Request both max and min temperatures
         params = {
             "latitude": station.lat,
             "longitude": station.lon,
-            "daily": "temperature_2m_max",
-            "timezone": station.timezone, # Explicit timezone
-            "models": ",".join(models),
+            "daily": "temperature_2m_max,temperature_2m_min",
+            "timezone": station.timezone,
+            "models": ",".join(TEMP_MODELS),
             "temperature_unit": "fahrenheit",
             "start_date": tomorrow_str,
             "end_date": tomorrow_str 
@@ -77,53 +75,48 @@ def fetch_open_meteo_temp():
             r = requests.get(OPEN_METEO_URL, params=params, timeout=15)
             r.raise_for_status()
             data = r.json()
-            
-            # API returns a list if multiple models? 
-            # No, if 'models' is comma-separated, it typically returns one JSON with fields `daily: { temperature_2m_max_modelname: [...] }`
-            # Wait, Open-Meteo docs say: if multiple models, `daily` has keys like `temperature_2m_max_gfs_seamless`.
-            
             daily_data = data.get("daily", {})
             
-            for api_model in models:
-                key = f"temperature_2m_max_{api_model}"
-                # If only 1 model requested, suffix might be omitted? No, usually if 'models' param is present, suffixes are used.
-                # But let's check.
-                if key not in daily_data and "temperature_2m_max" in daily_data and len(models) == 1:
-                     key = "temperature_2m_max"
+            for api_model in TEMP_MODELS:
+                friendly_name = MODEL_NAMES_MAP.get(api_model, api_model)
                 
-                if key in daily_data:
-                    vals = daily_data[key]
+                # High temperature
+                max_key = f"temperature_2m_max_{api_model}"
+                if max_key in daily_data:
+                    vals = daily_data[max_key]
                     if vals and vals[0] is not None:
                         val = float(vals[0])
-                        friendly_name = model_names_map.get(api_model, api_model)
-                        
                         save_temperature_forecast(
                             location_id=station.id,
                             target_date=tomorrow_str,
                             model_name=friendly_name,
-                            forecast_value=val
+                            forecast_value=val,
+                            forecast_type='high'
                         )
-                        logger.info(f"{station.id} {friendly_name} ({tomorrow_str}): {val} F")
+                        logger.info(f"{station.id} {friendly_name} HIGH ({tomorrow_str}): {val:.1f} F")
+                
+                # Low temperature
+                min_key = f"temperature_2m_min_{api_model}"
+                if min_key in daily_data:
+                    vals = daily_data[min_key]
+                    if vals and vals[0] is not None:
+                        val = float(vals[0])
+                        save_temperature_forecast(
+                            location_id=station.id,
+                            target_date=tomorrow_str,
+                            model_name=friendly_name,
+                            forecast_value=val,
+                            forecast_type='low'
+                        )
+                        logger.info(f"{station.id} {friendly_name} LOW ({tomorrow_str}): {val:.1f} F")
                         
         except Exception as e:
-            logger.error(f"Failed usage Open-Meteo for {station.id}: {e}")
+            logger.error(f"Failed Open-Meteo for {station.id}: {e}")
 
-def parse_duration(pt_string):
-    if not pt_string.startswith("PT"): return timedelta(0)
-    try:
-        val = int(pt_string[2:-1])
-        unit = pt_string[-1]
-        if unit == 'H': return timedelta(hours=val)
-        if unit == 'M': return timedelta(minutes=val)
-    except:
-        pass
-    return timedelta(0)
 
 def fetch_nws_temp():
-    """
-    Fetches Next Day Max Temp from NWS Gridpoints.
-    """
-    logger.info("Fetching Temperature from NWS...")
+    """Fetches Next Day Max and Min Temp from NWS Gridpoints."""
+    logger.info("Fetching Temperature (High & Low) from NWS...")
     
     headers = {"User-Agent": "(raincheck-app, contact@example.com)"}
     
@@ -134,7 +127,8 @@ def fetch_nws_temp():
             # 1. Get Points
             points_url = f"https://api.weather.gov/points/{station.lat},{station.lon}"
             r = requests.get(points_url, headers=headers, timeout=10)
-            if r.status_code != 200: continue
+            if r.status_code != 200: 
+                continue
             
             props = r.json().get('properties', {})
             grid_id = props.get('gridId')
@@ -144,54 +138,54 @@ def fetch_nws_temp():
             # 2. Get Gridpoints
             grid_url = f"https://api.weather.gov/gridpoints/{grid_id}/{grid_x},{grid_y}"
             r = requests.get(grid_url, headers=headers, timeout=10)
-            if r.status_code != 200: continue
+            if r.status_code != 200: 
+                continue
             
             data = r.json().get('properties', {})
-            
-            # Check unit
-            temp_uom = data.get("temperature", {}).get("uom", "wmoUnit:degC")
-            
-            # maxTemperature
-            max_temp_data = data.get("maxTemperature", {}).get("values", [])
-            
-            found_val = None
-            
-            # Find the value that covers "Tomorrow"
-            # NWS MaxT usually is a 12-hour or 24-hour block?
-            # We want the Max T for the calendar day of Tomorrow.
-            # Gridpoints usually gives "Daily Max" valid for a specific window (e.g. 7am - 7pm).
-            
-            # We look for a validTime that *starts* on Tomorrow's date (local).
-            # The validTime is ISO8601 (often with offset).
             
             tz = pytz.timezone(station.timezone)
             tomorrow_start = datetime.strptime(tomorrow_str, "%Y-%m-%d").replace(tzinfo=tz)
             tomorrow_end = tomorrow_start + timedelta(days=1)
             
-            for item in max_temp_data:
-                vt_str = item['validTime'].split('/')[0]
-                # parse ISO
-                dt = datetime.fromisoformat(vt_str)
-                
-                # Compare
-                # If dt is within [tomorrow_start, tomorrow_end)
-                if tomorrow_start <= dt < tomorrow_end:
-                    val = item['value']
-                    # Convert to F
-                    if "degC" in temp_uom:
+            # Helper to find temperature value for tomorrow
+            def find_temp_for_tomorrow(temp_data):
+                for item in temp_data:
+                    vt_str = item['validTime'].split('/')[0]
+                    dt = datetime.fromisoformat(vt_str)
+                    if tomorrow_start <= dt < tomorrow_end:
+                        val = item['value']
+                        if val is None:
+                            continue
+                        # NWS returns Celsius by default
                         val = (val * 9/5) + 32
-                    
-                    found_val = val
-                    break
+                        return val
+                return None
             
-            if found_val is not None:
+            # Max Temperature (High)
+            max_temp_data = data.get("maxTemperature", {}).get("values", [])
+            max_val = find_temp_for_tomorrow(max_temp_data)
+            if max_val is not None:
                 save_temperature_forecast(
                     location_id=station.id,
                     target_date=tomorrow_str,
                     model_name="NWS",
-                    forecast_value=found_val
+                    forecast_value=max_val,
+                    forecast_type='high'
                 )
-                logger.info(f"{station.id} NWS ({tomorrow_str}): {found_val:.1f} F")
+                logger.info(f"{station.id} NWS HIGH ({tomorrow_str}): {max_val:.1f} F")
+            
+            # Min Temperature (Low)
+            min_temp_data = data.get("minTemperature", {}).get("values", [])
+            min_val = find_temp_for_tomorrow(min_temp_data)
+            if min_val is not None:
+                save_temperature_forecast(
+                    location_id=station.id,
+                    target_date=tomorrow_str,
+                    model_name="NWS",
+                    forecast_value=min_val,
+                    forecast_type='low'
+                )
+                logger.info(f"{station.id} NWS LOW ({tomorrow_str}): {min_val:.1f} F")
                 
         except Exception as e:
             logger.error(f"Failed NWS for {station.id}: {e}")

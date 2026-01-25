@@ -34,6 +34,7 @@ export interface TemperatureForecast {
   location_id: string;
   target_date: string;
   model_name: string;
+  forecast_type: 'high' | 'low';
   forecast_value: number;
   observed_value: number | null;
   error: number | null;

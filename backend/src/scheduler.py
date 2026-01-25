@@ -58,19 +58,14 @@ def get_next_temperature_run() -> datetime:
     return target
 
 def run_temperature_rollover():
-    mst_tz = ZoneInfo("America/Denver")
-    now_mst = datetime.now(mst_tz)
-    today_str = now_mst.strftime("%Y-%m-%d")
-    tomorrow_str = (now_mst + timedelta(days=1)).strftime("%Y-%m-%d")
-
+    """
+    Daily temperature rollover at 6 PM MST:
+    1. Verify today's observed temps (compare with yesterday's forecast)
+    2. Fetch tomorrow's forecasts (high and low)
+    3. Update Kalshi markets
+    Historical forecast data is preserved for accuracy tracking.
+    """
     run_temperature_verify()
-
-    try:
-        from backend.src.db import cleanup_temperature_data
-        cleanup_temperature_data(today_str, tomorrow_str)
-    except Exception as e:
-        logger.error(f"Temperature cleanup failed: {e}")
-
     run_temperature_forecast()
     run_kalshi()
 

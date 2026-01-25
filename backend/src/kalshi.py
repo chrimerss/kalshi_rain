@@ -31,6 +31,8 @@ def fetch_kalshi_markets():
             tickers_to_fetch.append(station.kalshi_ticker)
         if station.kalshi_temp_ticker:
             tickers_to_fetch.append(station.kalshi_temp_ticker)
+        if station.kalshi_low_temp_ticker:
+            tickers_to_fetch.append(station.kalshi_low_temp_ticker)
             
         for ticker in tickers_to_fetch:
             logger.info(f"Fetching markets for {station.name} ({ticker})...")

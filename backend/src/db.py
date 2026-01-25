@@ -66,13 +66,20 @@ def init_db():
             location_id TEXT NOT NULL,
             target_date TEXT NOT NULL,       -- YYYY-MM-DD
             model_name TEXT NOT NULL,
-            forecast_value REAL,             -- Forecasted Max Temp (F)
-            observed_value REAL,             -- Observed Max Temp (F)
+            forecast_type TEXT DEFAULT 'high', -- 'high' or 'low'
+            forecast_value REAL,             -- Forecasted Temp (F)
+            observed_value REAL,             -- Observed Temp (F)
             error REAL,                      -- forecast - observed
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(location_id, target_date, model_name)
+            UNIQUE(location_id, target_date, model_name, forecast_type)
         )
     ''')
+    
+    # Migration: Add forecast_type column to existing table if missing
+    try:
+        c.execute("ALTER TABLE temperature_forecasts ADD COLUMN forecast_type TEXT DEFAULT 'high'")
+    except:
+        pass  # Column already exists
     
     conn.commit()
     conn.close()
@@ -178,23 +185,25 @@ def get_latest_markets(location_id):
     conn.close()
     return [dict(row) for row in rows]
 
-def save_temperature_forecast(location_id, target_date, model_name, forecast_value):
+def save_temperature_forecast(location_id, target_date, model_name, forecast_value, forecast_type='high'):
+    """Save a temperature forecast. forecast_type is 'high' or 'low'."""
     conn = get_db_connection()
     c = conn.cursor()
     
     # Upsert: preserved observed_value if it exists
     c.execute('''
-        INSERT INTO temperature_forecasts (location_id, target_date, model_name, forecast_value)
-        VALUES (?, ?, ?, ?)
-        ON CONFLICT(location_id, target_date, model_name) DO UPDATE SET
+        INSERT INTO temperature_forecasts (location_id, target_date, model_name, forecast_type, forecast_value)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(location_id, target_date, model_name, forecast_type) DO UPDATE SET
         forecast_value = excluded.forecast_value,
         created_at = CURRENT_TIMESTAMP
-    ''', (location_id, target_date, model_name, forecast_value))
+    ''', (location_id, target_date, model_name, forecast_type, forecast_value))
     
     conn.commit()
     conn.close()
 
-def update_temperature_observation(location_id, target_date, observed_value):
+def update_temperature_observation(location_id, target_date, observed_value, forecast_type='high'):
+    """Update observed temperature for a specific forecast type ('high' or 'low')."""
     conn = get_db_connection()
     c = conn.cursor()
 
@@ -203,14 +212,14 @@ def update_temperature_observation(location_id, target_date, observed_value):
 
     rounded_observed = round_half_up(observed_value)
 
-    # Update ALL model rows for that target_date with the same observed value.
+    # Update ALL model rows for that target_date and forecast_type with the same observed value.
     # Error is computed using rounded forecast and observed values.
     c.execute('''
         UPDATE temperature_forecasts
         SET observed_value = ?,
             error = (CAST(forecast_value + 0.5 AS INTEGER)) - ?
-        WHERE location_id = ? AND target_date = ?
-    ''', (rounded_observed, rounded_observed, location_id, target_date))
+        WHERE location_id = ? AND target_date = ? AND forecast_type = ?
+    ''', (rounded_observed, rounded_observed, location_id, target_date, forecast_type))
     
     conn.commit()
     conn.close()

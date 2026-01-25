@@ -145,93 +145,112 @@ def update_observed_precipitation():
             else:
                 logger.warning(f"Could not parse precip for {station.id}")
 
-def parse_max_temperature(html_content: bytes) -> Optional[float]:
-    """Parses the Yesterday's Maximum Temperature from CLI HTML content."""
+def _find_temperature_section(html_content: bytes) -> Optional[str]:
+    """Finds the TEMPERATURE section in CLI HTML content."""
     soup = BeautifulSoup(html_content, "html.parser")
-    
-    # CLI Format typically:
-    # TEMPERATURE (F)
-    #                                      YESTERDAY
-    # MAXIMUM                                 82    
-    # MINIMUM                                 70    
-    # AVERAGE                                 76    
-    
     pre_tags = soup.find_all("pre")
-    target_pre = None
+    
     for pre in pre_tags:
         if pre.text and ("TEMPERATURE (F)" in pre.text or "TEMPERATURE" in pre.text):
-            target_pre = pre
-            break
-            
-    if not target_pre:
-        logger.warning("Could not find TEMPERATURE section in CLI product")
-        return None
-        
-    lines = target_pre.text.split('\n')
-    
+            return pre.text
+    return None
+
+
+def _parse_temp_line(lines: list, keyword: str) -> Optional[float]:
+    """Parse temperature value from a line containing the keyword (MAXIMUM or MINIMUM)."""
     for line in lines:
-        if "MAXIMUM" in line:
-            # Line example: " MAXIMUM           82      69      1200 PM  "
-            # We want the first number which represents YESTERDAY.
+        if keyword in line:
             parts = line.split()
-            # parts: ['MAXIMUM', '82', '69', '1200', 'PM'] assuming format.
-            # Sometimes "MAXIMUM" is followed by a time? No usually strictly columnar.
-            
             for part in parts[1:]:
-                # skip non-numeric
-                if part == "MAXIMUM": continue
-                
-                # Check if it's a number
+                if part == keyword:
+                    continue
                 try:
-                    val = float(part)
-                    return val # First number is usually Yesterday's Max
+                    return float(part)
                 except ValueError:
                     continue
-                    
     return None
+
+
+def parse_max_temperature(html_content: bytes) -> Optional[float]:
+    """Parses the Maximum Temperature from CLI HTML content."""
+    temp_section = _find_temperature_section(html_content)
+    if not temp_section:
+        logger.warning("Could not find TEMPERATURE section in CLI product")
+        return None
+    
+    lines = temp_section.split('\n')
+    return _parse_temp_line(lines, "MAXIMUM")
+
+
+def parse_min_temperature(html_content: bytes) -> Optional[float]:
+    """Parses the Minimum Temperature from CLI HTML content."""
+    temp_section = _find_temperature_section(html_content)
+    if not temp_section:
+        logger.warning("Could not find TEMPERATURE section in CLI product")
+        return None
+    
+    lines = temp_section.split('\n')
+    return _parse_temp_line(lines, "MINIMUM")
 
 def update_observed_temperature(target_date_str: Optional[str] = None):
     """
-    Updates observed temperature for ALL stations.
-    If target_date_str is None, it assumes 'Today' relative to Now (in Station Local Time).
+    Updates observed high and low temperature for ALL stations.
+    If target_date_str is None, uses 'Today' in station's local time.
     This aligns with verifying today's forecast at 6 PM MST.
     """
     from .db import update_temperature_observation
-    import pytz # Need pytz for accurate local time calc if needed, 
-    # but CLI is always "Yesterday" relative to issuance.
-    # We just need to know what date "Yesterday" was for that station.
+    import pytz
     
     for station_code, station in STATIONS.items():
         logger.info(f"Scraping Temp for {station.name} ({station.id})...")
         content = fetch_cli_product(station)
-        if content:
-            max_temp = parse_max_temperature(content)
+        if not content:
+            continue
             
-            if max_temp is not None:
-                # determine date
-                # Station timezone
-                try:
-                    tz = pytz.timezone(station.timezone)
-                    now_local = datetime.now(tz)
-                    target_date = now_local.strftime("%Y-%m-%d")
-                    
-                    if target_date_str:
-                        # If manually specified, ensure it matches today's date for verification.
-                        if target_date_str != target_date:
-                            logger.warning(f"CLI verification uses today's date ({target_date}), but {target_date_str} requested.")
-                            continue
-                            
-                    logger.info(f"Found Max Temp for {station.id} ({target_date}): {max_temp}")
-                    
-                    update_temperature_observation(
-                        location_id=station.id,
-                        target_date=target_date,
-                        observed_value=max_temp
-                    )
-                except Exception as e:
-                    logger.error(f"Error determining date/saving for {station.id}: {e}")
-            else:
-                logger.warning(f"Could not parse Max Temp for {station.id}")
+        # Determine target date in station's timezone
+        try:
+            tz = pytz.timezone(station.timezone)
+            now_local = datetime.now(tz)
+            target_date = now_local.strftime("%Y-%m-%d")
+            
+            if target_date_str and target_date_str != target_date:
+                logger.warning(f"CLI verification uses today's date ({target_date}), but {target_date_str} requested.")
+                continue
+        except Exception as e:
+            logger.error(f"Error determining date for {station.id}: {e}")
+            continue
+        
+        # Parse and save high temperature
+        max_temp = parse_max_temperature(content)
+        if max_temp is not None:
+            logger.info(f"Found Max Temp (HIGH) for {station.id} ({target_date}): {max_temp}")
+            try:
+                update_temperature_observation(
+                    location_id=station.id,
+                    target_date=target_date,
+                    observed_value=max_temp,
+                    forecast_type='high'
+                )
+            except Exception as e:
+                logger.error(f"Error saving HIGH temp for {station.id}: {e}")
+        else:
+            logger.warning(f"Could not parse Max Temp for {station.id}")
+        
+        # Parse and save low temperature
+        min_temp = parse_min_temperature(content)
+        if min_temp is not None:
+            logger.info(f"Found Min Temp (LOW) for {station.id} ({target_date}): {min_temp}")
+            try:
+                update_temperature_observation(
+                    location_id=station.id,
+                    target_date=target_date,
+                    observed_value=min_temp,
+                    forecast_type='low'
+                )
+            except Exception as e:
+                logger.error(f"Error saving LOW temp for {station.id}: {e}")
+        else:
+            logger.warning(f"Could not parse Min Temp for {station.id}")
 
 if __name__ == "__main__":
     update_observed_precipitation()
