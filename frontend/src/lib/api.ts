@@ -137,7 +137,8 @@ export function getTemperatureForecasts(): TemperatureStationData[] {
   const stmt = db.prepare(`
       SELECT * FROM temperature_forecasts
       WHERE target_date >= date('now', 'localtime')
-      ORDER BY location_id, model_name
+         OR observed_value IS NOT NULL
+      ORDER BY location_id, model_name, target_date
   `);
   // Note: sqlite date('now') is UTC. 'localtime' depends on server.
   // Safest: distinct target_date descending.

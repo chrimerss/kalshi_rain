@@ -45,7 +45,9 @@ export default function TemperaturePage() {
 
                     // Process Forecasts
                     const dates = Array.from(new Set(data.forecasts.map(f => f.target_date))).sort();
-                    const targetDate = dates[0]; // Earliest future date (Tomorrow)
+                    const todayStr = new Date().toISOString().slice(0, 10);
+                    const futureDates = dates.filter(d => d >= todayStr);
+                    const targetDate = futureDates[0] || dates[dates.length - 1];
 
                     if (!targetDate) return null;
 
@@ -54,10 +56,8 @@ export default function TemperaturePage() {
                     // Build correctness counts per model using observed values.
                     const modelCorrectness: Record<string, number> = {};
                     data.forecasts.forEach(f => {
-                        if (f.observed_value === null || f.observed_value === undefined) return;
-                        const roundedForecast = Math.round(f.forecast_value);
-                        const roundedObserved = Math.round(f.observed_value);
-                        if (roundedForecast === roundedObserved) {
+                        if (f.error === null || f.error === undefined) return;
+                        if (f.error === 0) {
                             modelCorrectness[f.model_name] = (modelCorrectness[f.model_name] || 0) + 1;
                         }
                     });

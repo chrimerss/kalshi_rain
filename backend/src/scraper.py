@@ -193,9 +193,8 @@ def parse_max_temperature(html_content: bytes) -> Optional[float]:
 def update_observed_temperature(target_date_str: Optional[str] = None):
     """
     Updates observed temperature for ALL stations.
-    If target_date_str is None, it assumes 'Yesterday' relative to Now (in Station Local Time).
-    However, CLI product usually reports 'YESTERDAY' data.
-    So if we run this today, we are updating yesterday's observation.
+    If target_date_str is None, it assumes 'Today' relative to Now (in Station Local Time).
+    This aligns with verifying today's forecast at 6 PM MST.
     """
     from .db import update_temperature_observation
     import pytz # Need pytz for accurate local time calc if needed, 
@@ -214,14 +213,12 @@ def update_observed_temperature(target_date_str: Optional[str] = None):
                 try:
                     tz = pytz.timezone(station.timezone)
                     now_local = datetime.now(tz)
-                    yesterday_local = now_local - timedelta(days=1)
-                    target_date = yesterday_local.strftime("%Y-%m-%d")
+                    target_date = now_local.strftime("%Y-%m-%d")
                     
                     if target_date_str:
-                        # If manually specified, use it? But CLI only provides "Yesterday".
-                        # So we can only verify if target_date_str matches yesterday.
+                        # If manually specified, ensure it matches today's date for verification.
                         if target_date_str != target_date:
-                            logger.warning(f"CLI only has Yesterday data ({target_date}), but {target_date_str} requested.")
+                            logger.warning(f"CLI verification uses today's date ({target_date}), but {target_date_str} requested.")
                             continue
                             
                     logger.info(f"Found Max Temp for {station.id} ({target_date}): {max_temp}")

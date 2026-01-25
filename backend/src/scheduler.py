@@ -57,6 +57,23 @@ def get_next_temperature_run() -> datetime:
         target = target + timedelta(days=1)
     return target
 
+def run_temperature_rollover():
+    mst_tz = ZoneInfo("America/Denver")
+    now_mst = datetime.now(mst_tz)
+    today_str = now_mst.strftime("%Y-%m-%d")
+    tomorrow_str = (now_mst + timedelta(days=1)).strftime("%Y-%m-%d")
+
+    run_temperature_verify()
+
+    try:
+        from backend.src.db import cleanup_temperature_data
+        cleanup_temperature_data(today_str, tomorrow_str)
+    except Exception as e:
+        logger.error(f"Temperature cleanup failed: {e}")
+
+    run_temperature_forecast()
+    run_kalshi()
+
 if __name__ == "__main__":
     logger.info("Starting Scheduler...")
     
@@ -88,7 +105,7 @@ if __name__ == "__main__":
             last_scrape_time = current_time
 
         if datetime.now(ZoneInfo("America/Denver")) >= next_temp_run:
-            run_temperature_forecast()
+            run_temperature_rollover()
             next_temp_run = get_next_temperature_run()
             
         # Sleep for 60 seconds

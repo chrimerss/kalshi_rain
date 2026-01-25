@@ -215,6 +215,26 @@ def update_temperature_observation(location_id, target_date, observed_value):
     conn.commit()
     conn.close()
 
+def cleanup_temperature_data(today_str: str, tomorrow_str: str):
+    conn = get_db_connection()
+    c = conn.cursor()
+
+    # Keep historical rows (before today) and only tomorrow's forecasts.
+    c.execute('''
+        DELETE FROM temperature_forecasts
+        WHERE target_date >= ? AND target_date != ?
+    ''', (today_str, tomorrow_str))
+
+    # Keep only tomorrow's temperature markets.
+    c.execute('''
+        DELETE FROM kalshi_markets
+        WHERE ticker NOT LIKE 'KXRAIN%'
+          AND (target_date IS NULL OR target_date != ?)
+    ''', (tomorrow_str,))
+
+    conn.commit()
+    conn.close()
+
 def get_temperature_forecasts(location_id, limit=30):
     conn = get_db_connection()
     conn.row_factory = sqlite3.Row

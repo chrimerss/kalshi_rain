@@ -104,11 +104,11 @@ STATIONS: Dict[str, Station] = {
     "AUS": Station(
         id="KAUS",
         name="Austin-Bergstrom International Airport, TX",
-        lat=30.1975,
-        lon=-97.6664,
+        lat=30.18,
+        lon=-97.68,
         kalshi_ticker="KXRAINAUSM", 
         kalshi_temp_ticker="KXHIGHAUS",
-        nws_station_id="ATT",
+        nws_station_id="AUS",
         wfo_id="EWX",
         timezone="America/Chicago"
     ),
