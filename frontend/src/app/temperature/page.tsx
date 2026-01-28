@@ -3,19 +3,68 @@
 import { useState, useEffect } from 'react';
 import TemperatureThermometer from '@/components/TemperatureThermometer';
 
-// Mapping for display names
-const STATION_NAMES: Record<string, string> = {
-    "KNYC": "NYC (Central Park)",
-    "KLAX": "Los Angeles (KLAX)",
-    "KMIA": "Miami",
-    "KMDW": "Chicago",
-    "KSFO": "San Francisco",
-    "KHOU": "Houston (Hobby)",
-    "KSEA": "Seattle",
-    "KAUS": "Austin",
-    "KDFW": "Dallas",
-    "KDEN": "Denver"
+// Mapping for display names and station IDs
+// Stations with hasDashboard=true will link to the Synoptic dashboard
+const STATION_INFO: Record<string, { name: string; stationId: string; hasDashboard: boolean }> = {
+    "KNYC": { name: "NYC (Central Park)", stationId: "KNYC", hasDashboard: false },
+    "KLAX": { name: "Los Angeles (KLAX)", stationId: "KLAX", hasDashboard: false },
+    "KMIA": { name: "Miami", stationId: "KMIA", hasDashboard: false },
+    "KMDW": { name: "Chicago", stationId: "KMDW", hasDashboard: false },
+    "KSFO": { name: "San Francisco", stationId: "KSFO", hasDashboard: false },
+    "KHOU": { name: "Houston (Hobby)", stationId: "KHOU", hasDashboard: false },
+    "KSEA": { name: "Seattle", stationId: "KSEA", hasDashboard: true },  // Dashboard enabled
+    "KAUS": { name: "Austin", stationId: "KAUS", hasDashboard: false },
+    "KDFW": { name: "Dallas", stationId: "KDFW", hasDashboard: false },
+    "KDEN": { name: "Denver", stationId: "KDEN", hasDashboard: false }
 };
+
+/**
+ * Parse market title to extract temperature range.
+ * Examples: "20° to 21°", "Below 20°", "Above 80°"
+ */
+function parseMarketRange(title: string): { min: number | null; max: number | null } {
+    // Match patterns like "20° to 21°" or "20 to 21"
+    const rangeMatch = title.match(/(\d+)\s*°?\s*to\s*(\d+)/i);
+    if (rangeMatch) {
+        return { min: parseInt(rangeMatch[1]), max: parseInt(rangeMatch[2]) };
+    }
+    // Match "Below X" or "Under X"
+    const belowMatch = title.match(/below\s*(\d+)|under\s*(\d+)/i);
+    if (belowMatch) {
+        const val = parseInt(belowMatch[1] || belowMatch[2]);
+        return { min: null, max: val };
+    }
+    // Match "Above X" or "Over X"  
+    const aboveMatch = title.match(/above\s*(\d+)|over\s*(\d+)/i);
+    if (aboveMatch) {
+        const val = parseInt(aboveMatch[1] || aboveMatch[2]);
+        return { min: val, max: null };
+    }
+    return { min: null, max: null };
+}
+
+/**
+ * Count how many forecasts fall into a market bracket.
+ */
+function countModelsInBracket(
+    forecasts: { temp: number }[],
+    range: { min: number | null; max: number | null }
+): number {
+    return forecasts.filter(f => {
+        const temp = Math.round(f.temp);
+        if (range.min !== null && range.max !== null) {
+            // Range like "20° to 21°" means temp >= 20 and temp <= 21
+            return temp >= range.min && temp <= range.max;
+        } else if (range.min !== null) {
+            // "Above X" means temp > X
+            return temp > range.min;
+        } else if (range.max !== null) {
+            // "Below X" means temp < X
+            return temp < range.max;
+        }
+        return false;
+    }).length;
+}
 
 interface TemperatureForecast {
     location_id: string;
@@ -60,9 +109,15 @@ export default function TemperaturePage() {
             });
     }, []);
 
+    // Determine if showing today or tomorrow based on MST time
+    const now = new Date();
+    const mstTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Denver' }));
+    const hourMST = mstTime.getHours();
+    const dayLabel = hourMST >= 20 ? 'Tomorrow' : 'Today';  // Switch at 8 PM MST
+    
     const headerText = viewType === 'high' 
-        ? 'Next Day Maximum Temperature (F)' 
-        : 'Next Day Minimum Temperature (F)';
+        ? `${dayLabel}'s Maximum Temperature (F)` 
+        : `${dayLabel}'s Minimum Temperature (F)`;
 
     return (
         <main className="min-h-screen bg-gray-50 p-8">
@@ -114,16 +169,35 @@ export default function TemperaturePage() {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                     {stationData.map((data) => {
-                        const locationName = STATION_NAMES[data.location_id] || data.location_id;
+                        const stationInfo = STATION_INFO[data.location_id] || { name: data.location_id, stationId: data.location_id, hasDashboard: false };
+                        const locationName = stationInfo.name;
+                        // Link to Synoptic dashboard if available, otherwise no link
+                        const dashboardUrl = stationInfo.hasDashboard ? `/obs/` : null;
 
                         // Filter forecasts by type
                         const typeForecasts = data.forecasts.filter(f => f.forecast_type === viewType);
                         
-                        // Get available dates for this type
+                        // Determine target date based on MST time:
+                        // Before 8 PM MST: show today's forecast
+                        // After 8 PM MST: show tomorrow's forecast
+                        const now = new Date();
+                        // Convert to MST (UTC-7, but handle daylight saving with America/Denver)
+                        const mstTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Denver' }));
+                        const hourMST = mstTime.getHours();
+                        
                         const dates = Array.from(new Set(typeForecasts.map(f => f.target_date))).sort();
                         const todayStr = new Date().toISOString().slice(0, 10);
-                        const futureDates = dates.filter(d => d >= todayStr);
-                        const targetDate = futureDates[0] || dates[dates.length - 1];
+                        
+                        let targetDate: string;
+                        if (hourMST >= 20) {
+                            // After 8 PM MST: show tomorrow's forecast
+                            const futureDates = dates.filter(d => d > todayStr);
+                            targetDate = futureDates[0] || dates[dates.length - 1];
+                        } else {
+                            // Before 8 PM MST: show today's forecast
+                            const todayOrFuture = dates.filter(d => d >= todayStr);
+                            targetDate = todayOrFuture[0] || dates[dates.length - 1];
+                        }
 
                         if (!targetDate) return null;
 
@@ -145,9 +219,11 @@ export default function TemperaturePage() {
                             correctCount: modelCorrectness[f.model_name] || 0
                         }));
 
-                        // Get observed value for display (if available for target date)
-                        const observedRow = relevantForecasts.find(f => f.observed_value !== null);
-                        const observed = observedRow?.observed_value ?? undefined;
+                        // Only show observed for past dates (target date's observation won't exist
+                        // until after 6 PM MST on that day)
+                        const observed = targetDate < todayStr
+                            ? typeForecasts.find(f => f.target_date === targetDate && f.observed_value !== null)?.observed_value ?? undefined
+                            : undefined;
 
                         // Filter Markets for Target Date and temp type
                         // High temp: KXHIGH prefix, Low temp: KXLOWT prefix
@@ -163,7 +239,18 @@ export default function TemperaturePage() {
                         return (
                             <div key={data.location_id} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
                                 <div className="flex justify-between items-center mb-4">
-                                    <h2 className="text-xl font-bold text-gray-800">{locationName}</h2>
+                                    <h2 className="text-xl font-bold text-gray-800">
+                                        {dashboardUrl ? (
+                                            <a 
+                                                href={dashboardUrl}
+                                                className="hover:text-blue-600 hover:underline transition"
+                                            >
+                                                {locationName}
+                                            </a>
+                                        ) : (
+                                            locationName
+                                        )}
+                                    </h2>
                                     <div className="text-xs font-mono text-gray-400">
                                         {targetDate}
                                     </div>
@@ -189,12 +276,23 @@ export default function TemperaturePage() {
                                         </h3>
                                         {relevantMarkets.length > 0 ? (
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                                {relevantMarkets.sort((a, b) => a.ticker.localeCompare(b.ticker)).map(m => (
-                                                    <div key={m.ticker} className="flex justify-between items-center bg-slate-50 p-2 rounded text-sm hover:bg-slate-100">
-                                                        <span className="truncate max-w-[150px] text-slate-700" title={m.title}>{m.title}</span>
-                                                        <span className="font-mono font-bold text-slate-900">{m.yes_price}¢</span>
-                                                    </div>
-                                                ))}
+                                                {relevantMarkets.sort((a, b) => a.ticker.localeCompare(b.ticker)).map(m => {
+                                                    const range = parseMarketRange(m.title);
+                                                    const modelsInBracket = countModelsInBracket(thermoForecasts, range);
+                                                    const totalModels = thermoForecasts.length;
+                                                    
+                                                    return (
+                                                        <div key={m.ticker} className="flex justify-between items-center bg-slate-50 p-2 rounded text-sm hover:bg-slate-100">
+                                                            <span className="text-slate-700" title={m.title}>
+                                                                {m.title} 
+                                                                <span className="text-slate-500 ml-1">
+                                                                    ({modelsInBracket}/{totalModels})
+                                                                </span>
+                                                            </span>
+                                                            <span className="font-mono font-bold text-slate-900 ml-2">{m.yes_price}¢</span>
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
                                         ) : (
                                             <div className="text-xs text-gray-400 italic">No markets found for this date.</div>

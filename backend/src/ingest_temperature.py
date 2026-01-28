@@ -44,20 +44,41 @@ MODEL_NAMES_MAP = {
 }
 
 
-def get_next_day_date(station: Station) -> tuple[datetime, str]:
-    """Returns (datetime_obj, date_string) for 'Tomorrow' in station's local time."""
+def get_forecast_target_date(station: Station) -> tuple[datetime, str]:
+    """
+    Returns (datetime_obj, date_string) for the target forecast date.
+    
+    Logic (based on MST time):
+    - After 8 PM MST and before midnight: forecast TOMORROW's temperature
+    - Before 8 PM MST: forecast TODAY's temperature
+    
+    This allows hourly updates throughout the day for the relevant target date.
+    """
+    # Use MST (America/Denver) for the 8 PM cutoff decision
+    mst_tz = pytz.timezone("America/Denver")
+    now_mst = datetime.now(mst_tz)
+    
+    # Determine target date based on MST time
+    if now_mst.hour >= 20:  # 8 PM MST or later
+        # After 8 PM: forecast tomorrow
+        target_date = now_mst + timedelta(days=1)
+    else:
+        # Before 8 PM: forecast today
+        target_date = now_mst
+    
+    # Convert to station's local timezone for the date string
     tz = pytz.timezone(station.timezone)
-    now_local = datetime.now(tz)
-    tomorrow_local = now_local + timedelta(days=1)
-    return tomorrow_local, tomorrow_local.strftime("%Y-%m-%d")
+    target_in_station_tz = target_date.astimezone(tz)
+    
+    return target_in_station_tz, target_in_station_tz.strftime("%Y-%m-%d")
 
 
 def fetch_open_meteo_temp():
-    """Fetches Next Day Max and Min Temp from Open-Meteo for all stations."""
+    """Fetches temperature forecasts from Open-Meteo for all stations."""
     logger.info("Fetching Temperature (High & Low) from Open-Meteo...")
     
     for station_id, station in STATIONS.items():
-        tomorrow_dt, tomorrow_str = get_next_day_date(station)
+        target_dt, target_str = get_forecast_target_date(station)
         
         # Request both max and min temperatures
         params = {
@@ -67,8 +88,8 @@ def fetch_open_meteo_temp():
             "timezone": station.timezone,
             "models": ",".join(TEMP_MODELS),
             "temperature_unit": "fahrenheit",
-            "start_date": tomorrow_str,
-            "end_date": tomorrow_str 
+            "start_date": target_str,
+            "end_date": target_str 
         }
         
         try:
@@ -88,12 +109,12 @@ def fetch_open_meteo_temp():
                         val = float(vals[0])
                         save_temperature_forecast(
                             location_id=station.id,
-                            target_date=tomorrow_str,
+                            target_date=target_str,
                             model_name=friendly_name,
                             forecast_value=val,
                             forecast_type='high'
                         )
-                        logger.info(f"{station.id} {friendly_name} HIGH ({tomorrow_str}): {val:.1f} F")
+                        logger.info(f"{station.id} {friendly_name} HIGH ({target_str}): {val:.1f} F")
                 
                 # Low temperature
                 min_key = f"temperature_2m_min_{api_model}"
@@ -103,26 +124,26 @@ def fetch_open_meteo_temp():
                         val = float(vals[0])
                         save_temperature_forecast(
                             location_id=station.id,
-                            target_date=tomorrow_str,
+                            target_date=target_str,
                             model_name=friendly_name,
                             forecast_value=val,
                             forecast_type='low'
                         )
-                        logger.info(f"{station.id} {friendly_name} LOW ({tomorrow_str}): {val:.1f} F")
+                        logger.info(f"{station.id} {friendly_name} LOW ({target_str}): {val:.1f} F")
                         
         except Exception as e:
             logger.error(f"Failed Open-Meteo for {station.id}: {e}")
 
 
 def fetch_nws_temp():
-    """Fetches Next Day Max and Min Temp from NWS Gridpoints."""
+    """Fetches temperature forecasts from NWS Gridpoints."""
     logger.info("Fetching Temperature (High & Low) from NWS...")
     
     headers = {"User-Agent": "(raincheck-app, contact@example.com)"}
     
     for station_id, station in STATIONS.items():
         try:
-            tomorrow_dt, tomorrow_str = get_next_day_date(station)
+            target_dt, target_str = get_forecast_target_date(station)
             
             # 1. Get Points
             points_url = f"https://api.weather.gov/points/{station.lat},{station.lon}"
@@ -144,15 +165,15 @@ def fetch_nws_temp():
             data = r.json().get('properties', {})
             
             tz = pytz.timezone(station.timezone)
-            tomorrow_start = datetime.strptime(tomorrow_str, "%Y-%m-%d").replace(tzinfo=tz)
-            tomorrow_end = tomorrow_start + timedelta(days=1)
+            target_start = datetime.strptime(target_str, "%Y-%m-%d").replace(tzinfo=tz)
+            target_end = target_start + timedelta(days=1)
             
-            # Helper to find temperature value for tomorrow
-            def find_temp_for_tomorrow(temp_data):
+            # Helper to find temperature value for the target date
+            def find_temp_for_target(temp_data):
                 for item in temp_data:
                     vt_str = item['validTime'].split('/')[0]
                     dt = datetime.fromisoformat(vt_str)
-                    if tomorrow_start <= dt < tomorrow_end:
+                    if target_start <= dt < target_end:
                         val = item['value']
                         if val is None:
                             continue
@@ -163,29 +184,29 @@ def fetch_nws_temp():
             
             # Max Temperature (High)
             max_temp_data = data.get("maxTemperature", {}).get("values", [])
-            max_val = find_temp_for_tomorrow(max_temp_data)
+            max_val = find_temp_for_target(max_temp_data)
             if max_val is not None:
                 save_temperature_forecast(
                     location_id=station.id,
-                    target_date=tomorrow_str,
+                    target_date=target_str,
                     model_name="NWS",
                     forecast_value=max_val,
                     forecast_type='high'
                 )
-                logger.info(f"{station.id} NWS HIGH ({tomorrow_str}): {max_val:.1f} F")
+                logger.info(f"{station.id} NWS HIGH ({target_str}): {max_val:.1f} F")
             
             # Min Temperature (Low)
             min_temp_data = data.get("minTemperature", {}).get("values", [])
-            min_val = find_temp_for_tomorrow(min_temp_data)
+            min_val = find_temp_for_target(min_temp_data)
             if min_val is not None:
                 save_temperature_forecast(
                     location_id=station.id,
-                    target_date=tomorrow_str,
+                    target_date=target_str,
                     model_name="NWS",
                     forecast_value=min_val,
                     forecast_type='low'
                 )
-                logger.info(f"{station.id} NWS LOW ({tomorrow_str}): {min_val:.1f} F")
+                logger.info(f"{station.id} NWS LOW ({target_str}): {min_val:.1f} F")
                 
         except Exception as e:
             logger.error(f"Failed NWS for {station.id}: {e}")

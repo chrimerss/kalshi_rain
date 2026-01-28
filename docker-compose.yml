@@ -28,4 +28,22 @@ services:
       - backend
     restart: unless-stopped
 
+  dashboard:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: raincheck-dashboard
+    command: micromamba run -n base python -m backend.src.synoptic_dashboard
+    ports:
+      - "8050:8050"
+    volumes:
+      - ./data:/app/backend/data
+      - ./backend/src:/app/backend/src
+    environment:
+      - DB_PATH=/app/backend/data/raincheck.db
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      - backend
+    restart: unless-stopped
+
 volumes: {}

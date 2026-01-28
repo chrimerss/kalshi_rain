@@ -81,6 +81,21 @@ def init_db():
     except:
         pass  # Column already exists
     
+    # Table for Synoptic real-time observations
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS synoptic_observations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            station_id TEXT NOT NULL,
+            obs_time TEXT NOT NULL,           -- ISO format timestamp
+            air_temp REAL,                    -- Temperature (F)
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(station_id, obs_time)
+        )
+    ''')
+    
+    # Index for fast lookups
+    c.execute('CREATE INDEX IF NOT EXISTS idx_synoptic_station_time ON synoptic_observations (station_id, obs_time)')
+    
     conn.commit()
     conn.close()
 
@@ -259,6 +274,49 @@ def get_temperature_forecasts(location_id, limit=30):
     rows = c.fetchall()
     conn.close()
     return [dict(row) for row in rows]
+
+def save_synoptic_observation(station_id: str, obs_time: str, air_temp: float):
+    """Save a synoptic observation."""
+    conn = get_db_connection()
+    c = conn.cursor()
+    
+    c.execute('''
+        INSERT OR REPLACE INTO synoptic_observations (station_id, obs_time, air_temp)
+        VALUES (?, ?, ?)
+    ''', (station_id, obs_time, air_temp))
+    
+    conn.commit()
+    conn.close()
+
+def get_synoptic_observations(station_id: str, hours: int = 24):
+    """Get recent synoptic observations for a station."""
+    conn = get_db_connection()
+    c = conn.cursor()
+    
+    c.execute('''
+        SELECT obs_time, air_temp FROM synoptic_observations
+        WHERE station_id = ?
+        ORDER BY obs_time DESC
+        LIMIT ?
+    ''', (station_id, hours * 60))  # Assume ~1 obs per minute
+    
+    rows = c.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+def clear_old_synoptic_observations(station_id: str, keep_hours: int = 48):
+    """Remove synoptic observations older than keep_hours."""
+    conn = get_db_connection()
+    c = conn.cursor()
+    
+    c.execute('''
+        DELETE FROM synoptic_observations
+        WHERE station_id = ? 
+        AND datetime(obs_time) < datetime('now', ? || ' hours')
+    ''', (station_id, f'-{keep_hours}'))
+    
+    conn.commit()
+    conn.close()
 
 if __name__ == "__main__":
     init_db()

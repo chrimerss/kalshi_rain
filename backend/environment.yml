@@ -13,6 +13,8 @@ dependencies:
   - pydantic
   - pytz
   - eccodes
+  - dash
+  - plotly
   - pip
   - pip:
     - redis

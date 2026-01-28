@@ -36,6 +36,12 @@ def run_scraper():
         logger.error(f"NWS scraper failed: {e}")
 
 def run_temperature_forecast():
+    """
+    Fetches temperature forecasts from Open-Meteo and NWS.
+    Target date logic (based on MST):
+    - Before 6 PM MST: forecast TODAY's temperature
+    - After 6 PM MST: forecast TOMORROW's temperature
+    """
     logger.info("Running Temperature Forecast Ingestion...")
     try:
         subprocess.run([PYTHON_EXEC, "-m", "backend.src.ingest_temperature", "--forecast"], check=True)
@@ -49,24 +55,25 @@ def run_temperature_verify():
     except subprocess.CalledProcessError as e:
         logger.error(f"Temperature verification failed: {e}")
 
-def get_next_temperature_run() -> datetime:
+def get_next_8pm_run() -> datetime:
+    """Get next 8 PM MST time for scraping and verification."""
     mst_tz = ZoneInfo("America/Denver")
     now_mst = datetime.now(mst_tz)
-    target = now_mst.replace(hour=18, minute=0, second=0, microsecond=0)
+    target = now_mst.replace(hour=20, minute=0, second=0, microsecond=0)
     if now_mst >= target:
         target = target + timedelta(days=1)
     return target
 
-def run_temperature_rollover():
+def run_8pm_rollover():
     """
-    Daily temperature rollover at 6 PM MST:
-    1. Verify today's observed temps (compare with yesterday's forecast)
-    2. Fetch tomorrow's forecasts (high and low)
+    Daily rollover at 8 PM MST:
+    1. Run scraper to get today's observed temps from NWS CLI reports
+       (pushed to 8 PM because some stations don't update by 6 PM)
+    2. Verify today's observed temps against yesterday's 6 PM forecast
     3. Update Kalshi markets
-    Historical forecast data is preserved for accuracy tracking.
     """
+    run_scraper()
     run_temperature_verify()
-    run_temperature_forecast()
     run_kalshi()
 
 if __name__ == "__main__":
@@ -79,8 +86,8 @@ if __name__ == "__main__":
     run_temperature_forecast()
     
     last_ingest_time = time.time()
-    last_scrape_time = time.time()
-    next_temp_run = get_next_temperature_run()
+    last_temp_forecast_time = time.time()
+    next_8pm_run = get_next_8pm_run()
     
     while True:
         current_time = time.time()
@@ -88,20 +95,21 @@ if __name__ == "__main__":
         # Run Kalshi every minute
         run_kalshi()
         
-        # Run Ingest every 6 hours (6 * 3600 seconds)
+        # Run Ingest (rain forecast) every 6 hours (6 * 3600 seconds)
         if current_time - last_ingest_time > 6 * 3600:
             run_ingest()
             last_ingest_time = current_time
 
-        # Run scraper every 6 hours (6 * 3600 seconds)
-        if current_time - last_scrape_time > 6 * 3600:
-            run_scraper()
-            run_temperature_verify()
-            last_scrape_time = current_time
+        # Run temperature forecast every hour (3600 seconds)
+        # Target date switches from today to tomorrow at 8 PM MST
+        if current_time - last_temp_forecast_time > 3600:
+            run_temperature_forecast()
+            last_temp_forecast_time = current_time
 
-        if datetime.now(ZoneInfo("America/Denver")) >= next_temp_run:
-            run_temperature_rollover()
-            next_temp_run = get_next_temperature_run()
+        # Daily 8 PM MST: scrape observed temps and verify against yesterday's forecast
+        if datetime.now(ZoneInfo("America/Denver")) >= next_8pm_run:
+            run_8pm_rollover()
+            next_8pm_run = get_next_8pm_run()
             
         # Sleep for 60 seconds
         time.sleep(60)
