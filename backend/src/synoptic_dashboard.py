@@ -25,7 +25,23 @@ logger = logging.getLogger(__name__)
 
 # Synoptic API Configuration
 SYNOPTIC_API_URL = "https://api.synopticdata.com/v2/stations/timeseries"
-SYNOPTIC_TOKEN = "3c76dc6c56844493a45ba26d43f31f38"
+
+# Read token from .token file (not committed to git)
+def _load_token():
+    """Load Synoptic API token from .token file."""
+    token_paths = [
+        Path(__file__).resolve().parent.parent.parent / ".token",  # /app/.token in container
+        Path("/app/.token"),  # Docker mount path
+        Path.home() / "kalshi_rain" / ".token",  # Local development
+    ]
+    for token_path in token_paths:
+        if token_path.exists():
+            with open(token_path, 'r') as f:
+                return f.read().strip()
+    logger.warning("No .token file found, using empty token")
+    return ""
+
+SYNOPTIC_TOKEN = _load_token()
 
 # Station configuration
 STATIONS = {

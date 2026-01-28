@@ -1,6 +1,10 @@
 # System
 .DS_Store
 
+# Secrets/Tokens
+.token
+.env
+
 # Python
 __pycache__/
 *.py[cod]

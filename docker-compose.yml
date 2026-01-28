@@ -39,6 +39,7 @@ services:
     volumes:
       - ./data:/app/backend/data
       - ./backend/src:/app/backend/src
+      - ./.token:/app/.token:ro  # Mount token file (read-only)
     environment:
       - DB_PATH=/app/backend/data/raincheck.db
       - PYTHONUNBUFFERED=1
