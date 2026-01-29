@@ -43,16 +43,82 @@ def _load_token():
 
 SYNOPTIC_TOKEN = _load_token()
 
-# Station configuration
+# Station configuration (with lat/lon for Open-Meteo forecast)
 STATIONS = {
-    "KSEA": {"name": "Seattle-Tacoma International Airport", "timezone": "America/Los_Angeles"},
-    "KLAX": {"name": "Los Angeles International Airport", "timezone": "America/Los_Angeles"},
+    "KNYC": {"name": "NYC (Central Park)", "timezone": "America/New_York", "lat": 40.7829, "lon": -73.9654},
+    "KLAX": {"name": "Los Angeles International Airport", "timezone": "America/Los_Angeles", "lat": 33.93806, "lon": -118.38889},
+    "KMIA": {"name": "Miami International Airport", "timezone": "America/New_York", "lat": 25.7932, "lon": -80.2906},
+    "KMDW": {"name": "Chicago Midway", "timezone": "America/Chicago", "lat": 41.7868, "lon": -87.7522},
+    "KSFO": {"name": "San Francisco International Airport", "timezone": "America/Los_Angeles", "lat": 37.6188, "lon": -122.3754},
+    "KSEA": {"name": "Seattle-Tacoma International Airport", "timezone": "America/Los_Angeles", "lat": 47.44472, "lon": -122.31361},
+    "KAUS": {"name": "Austin-Bergstrom International Airport", "timezone": "America/Chicago", "lat": 30.18, "lon": -97.68},
+    "KDEN": {"name": "Denver International Airport", "timezone": "America/Denver", "lat": 39.8561, "lon": -104.6737},
+    "KDCA": {"name": "Washington DC (Reagan National)", "timezone": "America/New_York", "lat": 38.84833, "lon": -77.03417},
+    "KPHL": {"name": "Philadelphia International Airport", "timezone": "America/New_York", "lat": 39.87327, "lon": -75.22678},
+    "KMSY": {"name": "New Orleans International Airport", "timezone": "America/Chicago", "lat": 29.99278, "lon": -90.25083},
+    "KLAS": {"name": "Las Vegas (McCarran)", "timezone": "America/Los_Angeles", "lat": 36.07188, "lon": -115.16340},
 }
+
+# Open-Meteo 15-minute forecast API
+OPENMETEO_API_URL = "https://api.open-meteo.com/v1/forecast"
 
 
 def celsius_to_fahrenheit(celsius: float) -> float:
     """Convert Celsius to Fahrenheit: F = C * 9/5 + 32"""
     return celsius * 9.0 / 5.0 + 32.0
+
+
+def fetch_openmeteo_forecast(lat: float, lon: float, timezone: str) -> dict:
+    """
+    Fetch hourly temperature forecast from Open-Meteo API for next 24 hours.
+    
+    Args:
+        lat: Latitude
+        lon: Longitude
+        timezone: Timezone string (e.g., 'America/Los_Angeles')
+    
+    Returns:
+        Dictionary with 'times' and 'temps_celsius' lists
+    """
+    import pytz
+    
+    params = {
+        "latitude": lat,
+        "longitude": lon,
+        "hourly": "temperature_2m",
+        "forecast_days": 1,
+        "timezone": timezone,
+    }
+    
+    try:
+        response = requests.get(OPENMETEO_API_URL, params=params, timeout=30)
+        response.raise_for_status()
+        data = response.json()
+        
+        hourly = data.get("hourly", {})
+        times = hourly.get("time", [])
+        temps = hourly.get("temperature_2m", [])
+        
+        if not times or not temps:
+            logger.warning(f"No forecast data from Open-Meteo for lat={lat}, lon={lon}")
+            return {"times": [], "temps_celsius": []}
+        
+        # Convert times to match Synoptic format (with timezone offset)
+        tz = pytz.timezone(timezone)
+        formatted_times = []
+        for t in times:
+            # Parse the time (Open-Meteo returns "2026-01-28T00:00")
+            dt = datetime.strptime(t, "%Y-%m-%dT%H:%M")
+            # Localize to the station timezone
+            dt_local = tz.localize(dt)
+            # Format with timezone offset to match Synoptic
+            formatted_times.append(dt_local.strftime("%Y-%m-%dT%H:%M:%S%z"))
+        
+        return {"times": formatted_times, "temps_celsius": temps}
+        
+    except Exception as e:
+        logger.error(f"Failed to fetch Open-Meteo forecast: {e}")
+        return {"times": [], "temps_celsius": []}
 
 
 def fetch_synoptic_data(station_id: str, recent_minutes: int = 1440) -> dict:
@@ -130,6 +196,9 @@ init_db()
 app = Dash(__name__, url_base_pathname='/obs/')
 
 app.layout = html.Div([
+    # URL location component for reading query parameters
+    dcc.Location(id='url', refresh=False),
+    
     html.H1("Real-Time Temperature Observations", 
             style={'textAlign': 'center', 'color': '#1e3a5f', 'marginBottom': '10px'}),
     
@@ -138,7 +207,7 @@ app.layout = html.Div([
         dcc.Dropdown(
             id='station-dropdown',
             options=[{'label': f"{v['name']} ({k})", 'value': k} for k, v in STATIONS.items()],
-            value='KSEA',
+            value='KSEA',  # Default, will be overridden by URL param
             style={'width': '400px', 'display': 'inline-block'}
         ),
         html.Label("  Time Range: ", style={'fontWeight': 'bold', 'marginLeft': '30px', 'marginRight': '10px'}),
@@ -191,6 +260,26 @@ app.layout = html.Div([
 
 
 @app.callback(
+    Output('station-dropdown', 'value'),
+    Input('url', 'search'),
+    prevent_initial_call=False
+)
+def set_station_from_url(search):
+    """Set station dropdown value from URL query parameter."""
+    from urllib.parse import parse_qs
+    
+    if search:
+        # Parse query string (e.g., "?station=KDCA")
+        params = parse_qs(search.lstrip('?'))
+        station = params.get('station', [None])[0]
+        if station and station in STATIONS:
+            return station
+    
+    # Default to first station in list
+    return list(STATIONS.keys())[0]
+
+
+@app.callback(
     Output('temp-graph', 'figure'),
     Output('last-update', 'children'),
     Output('last-obs-time', 'data'),
@@ -206,6 +295,14 @@ def update_graph(station_id, time_range, unit, n_intervals, last_obs_time):
     # Fetch fresh data from Synoptic API (returns Celsius)
     data = fetch_synoptic_data(station_id, recent_minutes=time_range)
     
+    # Fetch Open-Meteo 15-minute forecast
+    station_info = STATIONS.get(station_id, {})
+    forecast_data = fetch_openmeteo_forecast(
+        station_info.get("lat", 0),
+        station_info.get("lon", 0),
+        station_info.get("timezone", "UTC")
+    )
+    
     # Get latest observation time
     latest_obs_time = data["times"][-1] if data["times"] else ""
     is_new_data = latest_obs_time != last_obs_time and latest_obs_time != ""
@@ -217,6 +314,29 @@ def update_graph(station_id, time_range, unit, n_intervals, last_obs_time):
     # Create figure
     fig = go.Figure()
     
+    # Add Open-Meteo forecast line (light gray, behind observation)
+    if forecast_data["times"] and forecast_data["temps_celsius"]:
+        forecast_valid = []
+        for t, temp_c in zip(forecast_data["times"], forecast_data["temps_celsius"]):
+            if temp_c is not None:
+                if unit == 'F':
+                    temp_display = celsius_to_fahrenheit(temp_c)
+                else:
+                    temp_display = temp_c
+                forecast_valid.append((t, temp_display))
+        
+        if forecast_valid:
+            fc_times, fc_temps = zip(*forecast_valid)
+            fig.add_trace(go.Scatter(
+                x=fc_times,
+                y=fc_temps,
+                mode='lines',
+                name='Forecast (Open-Meteo)',
+                line=dict(color='#9ca3af', width=2, dash='dot'),  # Light gray, dotted
+                hovertemplate=f'%{{x}}<br>Forecast: %{{y:.2f}}°{unit}<extra></extra>'
+            ))
+    
+    # Add observation data (on top of forecast)
     if data["times"] and data["temps_celsius"]:
         # Filter out None values and convert based on selected unit
         valid_data = []
@@ -239,11 +359,11 @@ def update_graph(station_id, time_range, unit, n_intervals, last_obs_time):
                 x=times,
                 y=temps,
                 mode='lines',
-                name='Temperature',
+                name='Observed (Synoptic)',
                 line=dict(color=line_color, width=2),
                 fill='tozeroy',
                 fillcolor=fill_color,
-                hovertemplate=f'%{{x}}<br>Temperature: %{{y:.2f}}°{unit}<extra></extra>'
+                hovertemplate=f'%{{x}}<br>Observed: %{{y:.2f}}°{unit}<extra></extra>'
             ))
             
             # Add current temp annotation with 2 decimal precision
@@ -286,7 +406,14 @@ def update_graph(station_id, time_range, unit, n_intervals, last_obs_time):
         plot_bgcolor='white',
         paper_bgcolor='white',
         hovermode='x unified',
-        margin=dict(l=60, r=40, t=60, b=60)
+        margin=dict(l=60, r=40, t=60, b=60),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        )
     )
     
     # Status message with new data indicator

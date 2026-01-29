@@ -6,16 +6,18 @@ import TemperatureThermometer from '@/components/TemperatureThermometer';
 // Mapping for display names and station IDs
 // Stations with hasDashboard=true will link to the Synoptic dashboard
 const STATION_INFO: Record<string, { name: string; stationId: string; hasDashboard: boolean }> = {
-    "KNYC": { name: "NYC (Central Park)", stationId: "KNYC", hasDashboard: false },
-    "KLAX": { name: "Los Angeles (KLAX)", stationId: "KLAX", hasDashboard: false },
-    "KMIA": { name: "Miami", stationId: "KMIA", hasDashboard: false },
-    "KMDW": { name: "Chicago", stationId: "KMDW", hasDashboard: false },
-    "KSFO": { name: "San Francisco", stationId: "KSFO", hasDashboard: false },
-    "KHOU": { name: "Houston (Hobby)", stationId: "KHOU", hasDashboard: false },
-    "KSEA": { name: "Seattle", stationId: "KSEA", hasDashboard: true },  // Dashboard enabled
-    "KAUS": { name: "Austin", stationId: "KAUS", hasDashboard: false },
-    "KDFW": { name: "Dallas", stationId: "KDFW", hasDashboard: false },
-    "KDEN": { name: "Denver", stationId: "KDEN", hasDashboard: false }
+    "KNYC": { name: "NYC (Central Park)", stationId: "KNYC", hasDashboard: true },
+    "KLAX": { name: "Los Angeles (KLAX)", stationId: "KLAX", hasDashboard: true },
+    "KMIA": { name: "Miami", stationId: "KMIA", hasDashboard: true },
+    "KMDW": { name: "Chicago", stationId: "KMDW", hasDashboard: true },
+    "KSFO": { name: "San Francisco", stationId: "KSFO", hasDashboard: true },
+    "KSEA": { name: "Seattle", stationId: "KSEA", hasDashboard: true },
+    "KAUS": { name: "Austin", stationId: "KAUS", hasDashboard: true },
+    "KDEN": { name: "Denver", stationId: "KDEN", hasDashboard: true },
+    "KDCA": { name: "Washington DC", stationId: "KDCA", hasDashboard: true },
+    "KPHL": { name: "Philadelphia", stationId: "KPHL", hasDashboard: true },
+    "KMSY": { name: "New Orleans", stationId: "KMSY", hasDashboard: true },
+    "KLAS": { name: "Las Vegas", stationId: "KLAS", hasDashboard: true }
 };
 
 /**
@@ -171,8 +173,8 @@ export default function TemperaturePage() {
                     {stationData.map((data) => {
                         const stationInfo = STATION_INFO[data.location_id] || { name: data.location_id, stationId: data.location_id, hasDashboard: false };
                         const locationName = stationInfo.name;
-                        // Link to Synoptic dashboard if available, otherwise no link
-                        const dashboardUrl = stationInfo.hasDashboard ? `/obs/` : null;
+                        // Link to Synoptic dashboard with station parameter
+                        const dashboardUrl = stationInfo.hasDashboard ? `/obs/?station=${data.location_id}` : null;
 
                         // Filter forecasts by type
                         const typeForecasts = data.forecasts.filter(f => f.forecast_type === viewType);

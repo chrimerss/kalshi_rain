@@ -40,8 +40,8 @@ STATIONS: Dict[str, Station] = {
     "CLILAX": Station(
         id="KLAX",
         name="Los Angeles (KLAX), CA",
-        lat=33.93816, 
-        lon=-118.3866,
+        lat=33.93806, 
+        lon=-118.38889,
         kalshi_ticker="KXRAINLAXM", 
         kalshi_temp_ticker="KXHIGHLAX",
         kalshi_low_temp_ticker="KXLOWTLAX",
@@ -91,8 +91,8 @@ STATIONS: Dict[str, Station] = {
         lat=29.652400000000057,
         lon=-95.27722999999997,
         kalshi_ticker="KXRAINHOUM", 
-        kalshi_temp_ticker="KXHIGHHOU",
-        kalshi_low_temp_ticker="KXLOWTHOU",
+        kalshi_temp_ticker=None,  # No temp market
+        kalshi_low_temp_ticker=None,
         nws_station_id="HOU",
         wfo_id="NWS",
         timezone="America/Chicago"
@@ -100,8 +100,8 @@ STATIONS: Dict[str, Station] = {
     "SEA": Station(
         id="KSEA",
         name="Seattle-Tacoma International Airport, WA",
-        lat=47.4502,
-        lon=-122.3088,
+        lat=47.44472,
+        lon=-122.31361,
         kalshi_ticker="KXRAINSEAM", 
         kalshi_temp_ticker="KXHIGHTSEA",
         kalshi_low_temp_ticker="KXLOWTTSEA",
@@ -127,8 +127,8 @@ STATIONS: Dict[str, Station] = {
         lat=32.8998,
         lon=-97.0403,
         kalshi_ticker="KXRAINDALM", 
-        kalshi_temp_ticker="KXHIGHDAL",
-        kalshi_low_temp_ticker="KXLOWTDAL",
+        kalshi_temp_ticker=None,  # No temp market
+        kalshi_low_temp_ticker=None,
         nws_station_id="DFW",
         wfo_id="FWD",
         timezone="America/Chicago"
@@ -144,6 +144,54 @@ STATIONS: Dict[str, Station] = {
         nws_station_id="DEN",
         wfo_id="BOU",
         timezone="America/Denver"
+    ),
+    "DCA": Station(
+        id="KDCA",
+        name="Washington DC (Reagan National), DC",
+        lat=38.84833,
+        lon=-77.03417,
+        kalshi_ticker="",  # No rain market
+        kalshi_temp_ticker="KXHIGHTDC",
+        kalshi_low_temp_ticker="KXLOWTDC",
+        nws_station_id="DCA",
+        wfo_id="LWX",
+        timezone="America/New_York"
+    ),
+    "PHL": Station(
+        id="KPHL",
+        name="Philadelphia International Airport, PA",
+        lat=39.87327,
+        lon=-75.22678,
+        kalshi_ticker="",  # No rain market
+        kalshi_temp_ticker="KXHIGHPHIL",
+        kalshi_low_temp_ticker="KXLOWTPHIL",
+        nws_station_id="PHL",
+        wfo_id="PHI",
+        timezone="America/New_York"
+    ),
+    "MSY": Station(
+        id="KMSY",
+        name="New Orleans International Airport, LA",
+        lat=29.99278,
+        lon=-90.25083,
+        kalshi_ticker="",  # No rain market
+        kalshi_temp_ticker="KXHIGHTNOLA",
+        kalshi_low_temp_ticker="KXLOWTNOLA",
+        nws_station_id="MSY",
+        wfo_id="LIX",
+        timezone="America/Chicago"
+    ),
+    "LAS": Station(
+        id="KLAS",
+        name="Las Vegas (McCarran), NV",
+        lat=36.07188,
+        lon=-115.16340,
+        kalshi_ticker="",  # No rain market
+        kalshi_temp_ticker="KXHIGHTLV",
+        kalshi_low_temp_ticker="KXLOWTLV",
+        nws_station_id="LAS",
+        wfo_id="VEF",
+        timezone="America/Los_Angeles"
     )
 }
 
